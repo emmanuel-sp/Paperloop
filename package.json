@@ -1,0 +1,23 @@
+{
+  "name": "paperloop",
+  "private": true,
+  "packageManager": "pnpm@10.18.3",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @paperloop/contracts build && pnpm --parallel --filter @paperloop/contracts --filter @paperloop/server --filter @paperloop/web dev",
+    "build": "pnpm --filter @paperloop/contracts build && pnpm --filter @paperloop/server build && pnpm --filter @paperloop/web build",
+    "typecheck": "pnpm --filter @paperloop/contracts build && pnpm --filter @paperloop/contracts --filter @paperloop/server --filter @paperloop/web typecheck",
+    "lint": "eslint .",
+    "test": "pnpm --filter @paperloop/contracts build && pnpm --filter @paperloop/contracts --filter @paperloop/server test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.8.1",
+    "eslint": "^10.11.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^5.0.2"
+  }
+}
