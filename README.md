@@ -1,2 +1,41 @@
 # Paperloop
-An AI research search, implementation, and eval service
+
+Paperloop is a local workbench and MCP service for applying research to software projects and measuring the result. See [product scope](PRODUCT_SCOPE.md) and [technical design](TECHNICAL_DESIGN.md).
+
+## Repository map
+
+```text
+apps/
+  web/               React workbench, routes, UI, and API client
+    src/app/          App composition and routing
+  server/            Fastify service and future CLI/MCP entry points
+    src/              Server composition; add feature folders here
+packages/
+  contracts/         Shared Zod transport schemas and public types
+.github/workflows/    CI checks
+```
+
+Keep server features together under `apps/server/src/<feature>/` (projects, research, evaluations, experiments, schedules). Put transport adapters beside the feature they expose, while keeping shared startup and wiring in the server root. Add `apps/web/src/<feature>/` for each workbench feature, with only reusable UI primitives in a shared `components/` directory when needed. Keep database models private to the server; `packages/contracts` contains only types and schemas that cross API or MCP boundaries. Add directories when they first contain code, so the tree stays easy to scan.
+
+Generated `dist/`, `node_modules/`, and local application data stay out of Git. Documents and repository-wide configuration live at the root.
+
+## Development
+
+Use Node.js 24 and pnpm 10.18.3. Corepack can supply the pinned pnpm version.
+
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+The workbench runs at <http://127.0.0.1:5173> and proxies `/api` to the local service at <http://127.0.0.1:3000>. This first step provides a health endpoint and a connection indicator; project storage, service access boundaries, and MCP arrive in later Foundation issues.
+
+```bash
+pnpm build
+pnpm typecheck
+pnpm lint
+pnpm test
+```
+
+`pnpm build` compiles contracts first, then the server and web app. CI runs these commands with a frozen lockfile.
