@@ -29,7 +29,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The workbench runs at <http://127.0.0.1:5173> and proxies `/api` to the local service at <http://127.0.0.1:3000>. This first step provides a health endpoint and a connection indicator; project storage, service access boundaries, and MCP arrive in later Foundation issues.
+The workbench runs at <http://127.0.0.1:5173> and proxies `/api` to the local service at <http://127.0.0.1:3000>.
 
 Application state is stored in SQLite under `$PAPERLOOP_DATA_DIR` when set. Otherwise Paperloop uses the platform data location (`$XDG_DATA_HOME/paperloop` or `~/.local/share/paperloop` on Linux and WSL). Startup enables foreign keys and WAL, applies committed Drizzle migrations, and writes a consistent pre-migration backup under `backups/` when upgrading an existing database. Paperloop refuses to open a database whose schema is newer than the running application.
 
@@ -40,6 +40,13 @@ Only one service process may own a data directory at a time. `SIGINT` and `SIGTE
 Authenticated clients manage project profiles through `/api/v1/projects`. Profiles retain descriptions, objectives, constraints, and either a local directory or read-only GitHub repository reference. Repository credentials are intentionally not accepted by project contracts; integrations obtain them from separate local configuration. Every profile change, repository registration, or explicit context refresh appends a context version with its source, capture time, and Git revision when available. `GET /api/v1/projects/:id/context` returns that provenance history newest-first.
 
 The workbench opens with the local connection exchange, then keeps project selection and the active section in the URL. It includes persistent project navigation, setup for description-only/local/GitHub projects, context provenance, and routed placeholders for Research, Evaluations, Experiments, and Sources & schedules. Project reads and mutations use the real API with visible loading, empty, validation, connection, and retry states.
+
+Coding agents use the same project service through the authenticated Streamable
+HTTP endpoint at `http://127.0.0.1:3000/mcp`. It exposes structured tools for
+listing, reading, creating, and updating projects, registering repository
+context, refreshing provenance, and reading context history. See
+[Connect coding agents](docs/agent-connections.md) for Codex and Claude Code
+setup without committing the local connection secret.
 
 ```bash
 pnpm build

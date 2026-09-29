@@ -4,6 +4,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { healthResponseSchema } from '@paperloop/contracts';
 import { ZodError } from 'zod';
+import { registerProjectMcp } from './mcp/project-mcp.js';
 import { registerProjectRoutes } from './projects/project-routes.js';
 import {
   InvalidRepositoryError,
@@ -106,6 +107,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   registerProjectRoutes(app, projectService);
+  registerProjectMcp(app, projectService);
 
   app.setErrorHandler(async (error, request, reply) => {
     if (error instanceof ZodError) {
