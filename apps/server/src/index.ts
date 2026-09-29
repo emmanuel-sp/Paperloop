@@ -1,11 +1,10 @@
-import { createApp } from './app.js';
-
-const app = createApp();
+import { startServer } from './runtime/server.js';
 
 try {
-  const port = Number(process.env.PAPERLOOP_PORT ?? 3000);
-  await app.listen({ host: '127.0.0.1', port });
+  const server = await startServer();
+  console.log(`Paperloop listening at ${server.address}`);
+  console.log(`Connection credential: ${server.connectionSecretPath}`);
 } catch (error) {
-  app.log.error(error);
+  console.error(error);
   process.exitCode = 1;
 }
