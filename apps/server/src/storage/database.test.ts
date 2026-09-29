@@ -106,7 +106,9 @@ describe('openDatabase', () => {
     expect(database.sqlite.pragma('integrity_check', { simple: true })).toBe(
       'ok',
     );
-    expect(database.sqlite.pragma('user_version', { simple: true })).toBe(1);
+    expect(database.sqlite.pragma('user_version', { simple: true })).toBe(
+      SUPPORTED_SCHEMA_VERSION,
+    );
     database.close();
   });
 
