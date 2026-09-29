@@ -31,6 +31,8 @@ pnpm dev
 
 The workbench runs at <http://127.0.0.1:5173> and proxies `/api` to the local service at <http://127.0.0.1:3000>. This first step provides a health endpoint and a connection indicator; project storage, service access boundaries, and MCP arrive in later Foundation issues.
 
+Application state is stored in SQLite under `$PAPERLOOP_DATA_DIR` when set. Otherwise Paperloop uses the platform data location (`$XDG_DATA_HOME/paperloop` or `~/.local/share/paperloop` on Linux and WSL). Startup enables foreign keys and WAL, applies committed Drizzle migrations, and writes a consistent pre-migration backup under `backups/` when upgrading an existing database. Paperloop refuses to open a database whose schema is newer than the running application.
+
 ```bash
 pnpm build
 pnpm typecheck
