@@ -15,6 +15,13 @@
       "when": 1790653875946,
       "tag": "0001_chubby_caretaker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790699315600,
+      "tag": "0002_wealthy_vampiro",
+      "breakpoints": true
     }
   ]
 }

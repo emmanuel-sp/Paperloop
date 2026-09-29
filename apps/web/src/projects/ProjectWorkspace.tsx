@@ -1,5 +1,6 @@
 import type { Project } from '@paperloop/contracts';
 import { NavLink } from 'react-router';
+import { ResearchWorkspace } from '../research/ResearchWorkspace';
 
 const tabs = [
   ['overview', 'Overview'],
@@ -34,6 +35,8 @@ export function ProjectWorkspace({ activeTab, project }: ProjectWorkspaceProps) 
       </nav>
       {activeTab === 'overview' ? (
         <ProjectOverview project={project} />
+      ) : activeTab === 'research' ? (
+        <ResearchWorkspace projectId={project.id} />
       ) : (
         <section className="detail-panel placeholder-panel">
           <p className="eyebrow">Coming in this milestone sequence</p>

@@ -78,3 +78,145 @@ export const projectListResponseSchema = z.object({
   projects: z.array(projectSchema),
 });
 export type ProjectListResponse = z.infer<typeof projectListResponseSchema>;
+
+export const researchSourceKindSchema = z.enum([
+  'url',
+  'arxiv',
+  'reference',
+]);
+export type ResearchSourceKind = z.infer<typeof researchSourceKindSchema>;
+
+export const extractionStatusSchema = z.enum([
+  'pending',
+  'partial',
+  'complete',
+  'unavailable',
+  'failed',
+]);
+export type ExtractionStatus = z.infer<typeof extractionStatusSchema>;
+
+export const ingestResearchDocumentRequestSchema = z
+  .object({
+    title: nonEmptyText.max(500),
+    sourceKind: researchSourceKindSchema,
+    sourceReference: nonEmptyText.max(2_048),
+    canonicalUrl: z.url().max(2_048).optional(),
+    authors: z.array(nonEmptyText.max(200)).max(100).default([]),
+    sourceVersion: nonEmptyText.max(200).optional(),
+    extractionStatus: extractionStatusSchema.default('pending'),
+    extractedContent: z.string().trim().min(1).max(5_000_000).optional(),
+    extractionError: nonEmptyText.max(2_000).optional(),
+    submittedBy: z.enum(['user', 'agent']).default('user'),
+    retrievedAt: z.iso.datetime().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.sourceKind === 'url') {
+      try {
+        new URL(value.sourceReference);
+      } catch {
+        context.addIssue({
+          code: 'custom',
+          message: 'A valid URL is required when the source kind is URL.',
+          path: ['sourceReference'],
+        });
+      }
+    }
+    if (
+      (value.extractionStatus === 'partial' ||
+        value.extractionStatus === 'complete') &&
+      !value.extractedContent
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Extracted content is required for partial or complete extraction.',
+        path: ['extractedContent'],
+      });
+    }
+    if (value.extractionStatus === 'failed' && !value.extractionError) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An extraction error is required when extraction failed.',
+        path: ['extractionError'],
+      });
+    }
+  });
+export type IngestResearchDocumentRequest = z.infer<
+  typeof ingestResearchDocumentRequestSchema
+>;
+
+export const implementationClaimSchema = z.object({
+  claim: nonEmptyText.max(2_000),
+  evidence: nonEmptyText.max(2_000),
+});
+export type ImplementationClaim = z.infer<typeof implementationClaimSchema>;
+
+export const storeImplementationBriefRequestSchema = z.object({
+  summary: nonEmptyText.max(20_000),
+  applicability: nonEmptyText.max(20_000),
+  proposedChanges: z.array(nonEmptyText.max(2_000)).max(100).default([]),
+  risks: z.array(nonEmptyText.max(2_000)).max(100).default([]),
+  evaluationIdeas: z.array(nonEmptyText.max(2_000)).max(100).default([]),
+  sourceClaims: z.array(implementationClaimSchema).max(100).default([]),
+});
+export type StoreImplementationBriefRequest = z.infer<
+  typeof storeImplementationBriefRequestSchema
+>;
+
+export const implementationBriefSchema = z.object({
+  id: z.uuid(),
+  projectId: z.uuid(),
+  documentId: z.uuid(),
+  version: z.number().int().positive(),
+  summary: z.string(),
+  applicability: z.string(),
+  proposedChanges: z.array(z.string()),
+  risks: z.array(z.string()),
+  evaluationIdeas: z.array(z.string()),
+  sourceClaims: z.array(implementationClaimSchema),
+  createdAt: z.iso.datetime(),
+});
+export type ImplementationBrief = z.infer<typeof implementationBriefSchema>;
+
+export const researchDocumentSchema = z.object({
+  id: z.uuid(),
+  projectId: z.uuid(),
+  title: z.string(),
+  sourceKind: researchSourceKindSchema,
+  sourceReference: z.string(),
+  canonicalUrl: z.string().nullable(),
+  authors: z.array(z.string()),
+  sourceVersion: z.string().nullable(),
+  extractionStatus: extractionStatusSchema,
+  extractedContentAvailable: z.boolean(),
+  extractionError: z.string().nullable(),
+  submittedBy: z.enum(['user', 'agent']),
+  retrievedAt: z.iso.datetime().nullable(),
+  currentBrief: implementationBriefSchema.nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export type ResearchDocument = z.infer<typeof researchDocumentSchema>;
+
+export const researchDocumentListResponseSchema = z.object({
+  documents: z.array(researchDocumentSchema),
+});
+export type ResearchDocumentListResponse = z.infer<
+  typeof researchDocumentListResponseSchema
+>;
+
+export const readResearchContentRequestSchema = z.object({
+  offset: z.coerce.number().int().nonnegative().default(0),
+  limit: z.coerce.number().int().positive().max(20_000).default(10_000),
+});
+export type ReadResearchContentRequest = z.infer<
+  typeof readResearchContentRequestSchema
+>;
+
+export const researchContentPageSchema = z.object({
+  documentId: z.uuid(),
+  content: z.string(),
+  offset: z.number().int().nonnegative(),
+  nextOffset: z.number().int().positive().nullable(),
+  totalLength: z.number().int().nonnegative(),
+});
+export type ResearchContentPage = z.infer<typeof researchContentPageSchema>;

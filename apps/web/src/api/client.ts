@@ -1,9 +1,16 @@
 import {
   createProjectRequestSchema,
+  ingestResearchDocumentRequestSchema,
   projectListResponseSchema,
   projectSchema,
+  researchDocumentListResponseSchema,
+  researchDocumentSchema,
+  researchContentPageSchema,
   type CreateProjectRequest,
+  type IngestResearchDocumentRequest,
   type Project,
+  type ResearchDocument,
+  type ResearchContentPage,
 } from '@paperloop/contracts';
 
 export class ApiError extends Error {
@@ -67,5 +74,36 @@ export async function createProject(
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  );
+}
+
+export async function listResearchDocuments(
+  projectId: string,
+): Promise<ResearchDocument[]> {
+  const payload = await request(`/api/v1/projects/${projectId}/research`);
+  return researchDocumentListResponseSchema.parse(payload).documents;
+}
+
+export async function ingestResearchDocument(
+  projectId: string,
+  input: IngestResearchDocumentRequest,
+): Promise<ResearchDocument> {
+  const payload = ingestResearchDocumentRequestSchema.parse(input);
+  return researchDocumentSchema.parse(
+    await request(`/api/v1/projects/${projectId}/research`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function getResearchContent(
+  projectId: string,
+  documentId: string,
+): Promise<ResearchContentPage> {
+  return researchContentPageSchema.parse(
+    await request(
+      `/api/v1/projects/${projectId}/research/${documentId}/content?offset=0&limit=20000`,
+    ),
   );
 }

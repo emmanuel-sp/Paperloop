@@ -11,6 +11,11 @@ import {
   ProjectNotFoundError,
   ProjectService,
 } from './projects/project-service.js';
+import { registerResearchRoutes } from './research/research-routes.js';
+import {
+  ResearchDocumentNotFoundError,
+  ResearchService,
+} from './research/research-service.js';
 import {
   openDatabase,
   type PaperloopDatabase,
@@ -21,6 +26,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     database: PaperloopDatabase;
     projects: ProjectService;
+    research: ResearchService;
   }
 }
 
@@ -43,6 +49,8 @@ export function createApp(options: CreateAppOptions = {}) {
   app.decorate('database', database);
   const projectService = new ProjectService(database);
   app.decorate('projects', projectService);
+  const researchService = new ResearchService(database, projectService);
+  app.decorate('research', researchService);
 
   if (options.webRoot) {
     void app.register(fastifyStatic, {
@@ -107,7 +115,8 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   registerProjectRoutes(app, projectService);
-  registerProjectMcp(app, projectService);
+  registerResearchRoutes(app, researchService);
+  registerProjectMcp(app, projectService, researchService);
 
   app.setErrorHandler(async (error, request, reply) => {
     if (error instanceof ZodError) {
@@ -126,6 +135,12 @@ export function createApp(options: CreateAppOptions = {}) {
     if (error instanceof InvalidRepositoryError) {
       return reply.code(400).send({
         code: 'INVALID_REPOSITORY',
+        message: error.message,
+      });
+    }
+    if (error instanceof ResearchDocumentNotFoundError) {
+      return reply.code(404).send({
+        code: 'RESEARCH_DOCUMENT_NOT_FOUND',
         message: error.message,
       });
     }

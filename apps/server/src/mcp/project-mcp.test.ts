@@ -43,6 +43,11 @@ describe('project MCP endpoint', () => {
       'projects_register_repository',
       'projects_refresh_context',
       'projects_context_history',
+      'research_list',
+      'research_get',
+      'research_read_content',
+      'research_ingest',
+      'research_store_implementation_brief',
     ]);
 
     const created = await client.callTool({
@@ -87,6 +92,58 @@ describe('project MCP endpoint', () => {
     });
     expect(history.structuredContent).toMatchObject({
       contexts: [{ version: 2 }, { version: 1 }],
+    });
+
+    const paper = await client.callTool({
+      name: 'research_ingest',
+      arguments: {
+        projectId,
+        document: {
+          title: 'A supplied paper',
+          sourceKind: 'reference',
+          sourceReference: 'Doe et al. (2026)',
+          extractionStatus: 'complete',
+          extractedContent: 'Persisted source content.',
+          submittedBy: 'agent',
+        },
+      },
+    });
+    expect(paper.isError).not.toBe(true);
+    expect(paper.structuredContent).toMatchObject({
+      projectId,
+      extractionStatus: 'complete',
+    });
+    const documentId = (paper.structuredContent as { id: string }).id;
+    const content = await client.callTool({
+      name: 'research_read_content',
+      arguments: { projectId, documentId, page: { offset: 0, limit: 10 } },
+    });
+    expect(content.structuredContent).toMatchObject({
+      documentId,
+      content: 'Persisted ',
+      offset: 0,
+      nextOffset: 10,
+      totalLength: 25,
+    });
+
+    const brief = await client.callTool({
+      name: 'research_store_implementation_brief',
+      arguments: {
+        projectId,
+        documentId,
+        brief: {
+          summary: 'Apply the supplied technique.',
+          applicability: 'It aligns with the project objective.',
+          proposedChanges: ['Build one isolated candidate.'],
+          risks: [],
+          evaluationIdeas: ['Compare the existing and candidate paths.'],
+          sourceClaims: [],
+        },
+      },
+    });
+    expect(brief.structuredContent).toMatchObject({
+      id: documentId,
+      currentBrief: { version: 1 },
     });
   });
 
