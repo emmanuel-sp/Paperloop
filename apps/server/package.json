@@ -6,7 +6,7 @@
     "dev": "tsx watch src/index.ts",
     "db:generate": "drizzle-kit generate",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/index.js",
+    "start": "exec node dist/index.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
