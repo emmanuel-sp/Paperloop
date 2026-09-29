@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@fastify/static": "^10.1.5",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@paperloop/contracts": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.3",
