@@ -30,10 +30,12 @@ export async function startServer(
       ...(configuration.webRoot ? { webRoot: configuration.webRoot } : {}),
     });
     let closed = false;
+    const handleExit = () => instanceLock.release();
 
     const close = async () => {
       if (closed) return;
       closed = true;
+      process.off('exit', handleExit);
       process.off('SIGINT', handleSignal);
       process.off('SIGTERM', handleSignal);
       try {
@@ -47,6 +49,7 @@ export async function startServer(
       void close().catch((error: unknown) => app.log.error(error));
     };
 
+    process.once('exit', handleExit);
     if (options.installSignalHandlers !== false) {
       process.once('SIGINT', handleSignal);
       process.once('SIGTERM', handleSignal);
