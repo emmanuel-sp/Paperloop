@@ -37,6 +37,8 @@ The service binds only to `127.0.0.1` by default. `PAPERLOOP_PORT` selects the p
 
 Only one service process may own a data directory at a time. `SIGINT` and `SIGTERM` close the HTTP server and database before releasing that ownership. A stale lock left by a stopped process is recovered on the next startup.
 
+Authenticated clients manage project profiles through `/api/v1/projects`. Profiles retain descriptions, objectives, constraints, and either a local directory or read-only GitHub repository reference. Repository credentials are intentionally not accepted by project contracts; integrations obtain them from separate local configuration. Every profile change, repository registration, or explicit context refresh appends a context version with its source, capture time, and Git revision when available. `GET /api/v1/projects/:id/context` returns that provenance history newest-first.
+
 ```bash
 pnpm build
 pnpm typecheck

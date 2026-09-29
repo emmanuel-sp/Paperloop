@@ -3,6 +3,13 @@ import { resolve } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { healthResponseSchema } from '@paperloop/contracts';
+import { ZodError } from 'zod';
+import { registerProjectRoutes } from './projects/project-routes.js';
+import {
+  InvalidRepositoryError,
+  ProjectNotFoundError,
+  ProjectService,
+} from './projects/project-service.js';
 import {
   openDatabase,
   type PaperloopDatabase,
@@ -12,6 +19,7 @@ import {
 declare module 'fastify' {
   interface FastifyInstance {
     database: PaperloopDatabase;
+    projects: ProjectService;
   }
 }
 
@@ -32,6 +40,8 @@ export function createApp(options: CreateAppOptions = {}) {
     .digest('base64url');
 
   app.decorate('database', database);
+  const projectService = new ProjectService(database);
+  app.decorate('projects', projectService);
 
   if (options.webRoot) {
     void app.register(fastifyStatic, {
@@ -65,12 +75,13 @@ export function createApp(options: CreateAppOptions = {}) {
 
     const bearer = request.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
     const cookie = readCookie(request.headers.cookie, 'paperloop_session');
-    const suppliedCredential =
-      path === '/api/v1/session' ? bearer : bearer ?? cookie;
-    const expectedCredential =
-      path === '/api/v1/session' ? connectionSecret : browserSession;
+    const authenticated =
+      path === '/api/v1/session'
+        ? credentialsMatch(bearer, connectionSecret)
+        : credentialsMatch(bearer, connectionSecret) ||
+          credentialsMatch(cookie, browserSession);
 
-    if (!credentialsMatch(suppliedCredential, expectedCredential)) {
+    if (!authenticated) {
       return reply.code(401).send({
         code: 'UNAUTHORIZED',
         message: 'A valid local Paperloop connection credential is required.',
@@ -92,6 +103,36 @@ export function createApp(options: CreateAppOptions = {}) {
       `paperloop_session=${browserSession}; Path=/; HttpOnly; SameSite=Strict`,
     );
     return reply.code(204).send();
+  });
+
+  registerProjectRoutes(app, projectService);
+
+  app.setErrorHandler(async (error, request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.code(400).send({
+        code: 'INVALID_REQUEST',
+        message: 'The request did not match the expected contract.',
+        details: error.issues,
+      });
+    }
+    if (error instanceof ProjectNotFoundError) {
+      return reply.code(404).send({
+        code: 'PROJECT_NOT_FOUND',
+        message: error.message,
+      });
+    }
+    if (error instanceof InvalidRepositoryError) {
+      return reply.code(400).send({
+        code: 'INVALID_REPOSITORY',
+        message: error.message,
+      });
+    }
+
+    request.log.error(error);
+    return reply.code(500).send({
+      code: 'INTERNAL_ERROR',
+      message: 'Paperloop could not complete the request.',
+    });
   });
 
   if (options.webRoot) {
@@ -131,7 +172,11 @@ function credentialsMatch(
 function isAllowedHost(host: string): boolean {
   try {
     const hostname = new URL(`http://${host}`).hostname;
-    return hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '[::1]';
+    return (
+      hostname === '127.0.0.1' ||
+      hostname === 'localhost' ||
+      hostname === '[::1]'
+    );
   } catch {
     return false;
   }

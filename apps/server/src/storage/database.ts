@@ -7,7 +7,7 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import * as schema from './schema.js';
 
-export const SUPPORTED_SCHEMA_VERSION = 1;
+export const SUPPORTED_SCHEMA_VERSION = 2;
 export const DEFAULT_DATABASE_FILE_NAME = 'paperloop.sqlite';
 
 const defaultMigrationsFolder = fileURLToPath(
