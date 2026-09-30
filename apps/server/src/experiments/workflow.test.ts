@@ -276,6 +276,40 @@ describe('milestone 2 experiment loop', () => {
       outcome: 'improvement',
       metrics: [{ delta: 2, percentChange: 20, passed: true }],
     });
+    const recommendation = app.discovery.storeRecommendation(project.id, {
+      documentId: paper.id,
+      title: 'Evaluate the supplied technique',
+      summary: 'Compare one isolated change.',
+      applicability: 'Matches this project objective.',
+      prerequisites: [],
+      uncertainty: 'Source results may not transfer.',
+      evaluationTargets: ['Compare score under the approved harness'],
+      sources: [
+        {
+          documentId: paper.id,
+          claim: 'A useful technique.',
+          evidence: 'The supplied research.',
+        },
+      ],
+      projectContextVersion: project.currentContext.version,
+    });
+    const tested = await client.callTool({
+      name: 'research_triage',
+      arguments: {
+        projectId: project.id,
+        recommendationId: recommendation.id,
+        triage: {
+          state: 'tested',
+          reason: 'Completed the approved comparison.',
+          experimentId: id,
+        },
+      },
+    });
+    expect(tested.isError).not.toBe(true);
+    expect(tested.structuredContent).toMatchObject({
+      state: 'tested',
+      experimentId: id,
+    });
     expect(app.experiments.artifact(candidate.id, 'stdout.log')).toContain(
       'evaluation complete',
     );
@@ -300,6 +334,9 @@ describe('milestone 2 experiment loop', () => {
       storage: { dataDirectory },
     });
     cleanup.push(() => restarted.close());
+    expect(restarted.discovery.recommendations(project.id)).toMatchObject([
+      { state: 'tested', experimentId: id },
+    ]);
     expect(restarted.experiments.detail(id)).toMatchObject({
       experiment: { status: 'completed' },
       comparisons: [{ outcome: 'improvement' }],

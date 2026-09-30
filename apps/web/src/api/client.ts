@@ -24,7 +24,10 @@ export class ApiError extends Error {
   }
 }
 
-export async function request(path: string, init?: RequestInit): Promise<unknown> {
+export async function request(
+  path: string,
+  init?: RequestInit,
+): Promise<unknown> {
   const response = await fetch(path, {
     ...init,
     credentials: 'same-origin',
@@ -36,8 +39,7 @@ export async function request(path: string, init?: RequestInit): Promise<unknown
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => undefined)) as
-      | { code?: string; message?: string }
-      | undefined;
+      { code?: string; message?: string } | undefined;
     throw new ApiError(
       payload?.message ?? `Paperloop request failed (${response.status}).`,
       response.status,
@@ -100,10 +102,11 @@ export async function ingestResearchDocument(
 export async function getResearchContent(
   projectId: string,
   documentId: string,
+  offset = 0,
 ): Promise<ResearchContentPage> {
   return researchContentPageSchema.parse(
     await request(
-      `/api/v1/projects/${projectId}/research/${documentId}/content?offset=0&limit=20000`,
+      `/api/v1/projects/${projectId}/research/${documentId}/content?offset=${offset}&limit=20000`,
     ),
   );
 }

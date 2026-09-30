@@ -14,6 +14,12 @@ import {
   ProjectNotFoundError,
   ProjectService,
 } from './projects/project-service.js';
+import { DiscoveryService } from './research/discovery-service.js';
+import { registerDiscoveryRoutes } from './research/discovery-routes.js';
+import {
+  SourceFetchError,
+  type PublicFetcher,
+} from './research/public-fetch.js';
 import { registerResearchRoutes } from './research/research-routes.js';
 import {
   ResearchDocumentNotFoundError,
@@ -30,6 +36,7 @@ declare module 'fastify' {
     database: PaperloopDatabase;
     projects: ProjectService;
     research: ResearchService;
+    discovery: DiscoveryService;
     plans: PlanService;
     experiments: ExperimentService;
   }
@@ -37,6 +44,7 @@ declare module 'fastify' {
 
 export interface CreateAppOptions {
   connectionSecret?: string;
+  researchFetcher?: PublicFetcher;
   logger?: boolean;
   storage?: OpenDatabaseOptions;
   webRoot?: string;
@@ -56,6 +64,13 @@ export function createApp(options: CreateAppOptions = {}) {
   app.decorate('projects', projectService);
   const researchService = new ResearchService(database, projectService);
   app.decorate('research', researchService);
+  const discovery = new DiscoveryService(
+    database,
+    projectService,
+    researchService,
+    options.researchFetcher,
+  );
+  app.decorate('discovery', discovery);
   const plans = new PlanService(database, projectService);
   const experiments = new ExperimentService(
     database,
@@ -103,12 +118,10 @@ export function createApp(options: CreateAppOptions = {}) {
       path?.endsWith('/approve') &&
       !credentialsMatch(cookie, browserSession)
     ) {
-      return reply
-        .code(403)
-        .send({
-          code: 'UI_APPROVAL_REQUIRED',
-          message: 'Approve this plan in the connected workbench.',
-        });
+      return reply.code(403).send({
+        code: 'UI_APPROVAL_REQUIRED',
+        message: 'Approve this plan in the connected workbench.',
+      });
     }
     const authenticated =
       path === '/api/v1/session'
@@ -143,10 +156,22 @@ export function createApp(options: CreateAppOptions = {}) {
 
   registerProjectRoutes(app, projectService);
   registerResearchRoutes(app, researchService);
+  registerDiscoveryRoutes(app, discovery, researchService);
   registerWorkflowRoutes(app, plans, experiments);
-  registerProjectMcp(app, projectService, researchService, plans, experiments);
+  registerProjectMcp(
+    app,
+    projectService,
+    researchService,
+    plans,
+    experiments,
+    discovery,
+  );
 
   app.setErrorHandler(async (error, request, reply) => {
+    if (error instanceof SourceFetchError)
+      return reply
+        .code(400)
+        .send({ code: 'INVALID_SOURCE_URL', message: error.message });
     if (error instanceof WorkflowError)
       return reply
         .code(error.statusCode)

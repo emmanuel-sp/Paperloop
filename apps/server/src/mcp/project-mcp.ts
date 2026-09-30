@@ -27,6 +27,9 @@ import type { PlanService } from '../evaluations/plan-service.js';
 import type { ExperimentService } from '../experiments/experiment-service.js';
 import { registerWorkflowMcp } from './workflow-mcp.js';
 
+import { registerDiscoveryMcp } from './discovery-mcp.js';
+import type { DiscoveryService } from '../research/discovery-service.js';
+
 const projectIdInputSchema = z.object({ projectId: z.uuid() });
 const updateProjectInputSchema = z.object({
   projectId: z.uuid(),
@@ -61,12 +64,24 @@ export function registerProjectMcp(
   research: ResearchService,
   plans: PlanService,
   experiments: ExperimentService,
+  discovery: DiscoveryService,
 ): void {
   app.post('/mcp', async (request, reply) => {
-    await handleMcpPost(request, reply, projects, research, plans, experiments);
+    await handleMcpPost(
+      request,
+      reply,
+      projects,
+      research,
+      plans,
+      experiments,
+      discovery,
+    );
   });
 
-  const methodNotAllowed = async (_request: FastifyRequest, reply: FastifyReply) =>
+  const methodNotAllowed = async (
+    _request: FastifyRequest,
+    reply: FastifyReply,
+  ) =>
     reply.code(405).send({
       jsonrpc: '2.0',
       error: { code: -32_000, message: 'Method not allowed.' },
@@ -83,8 +98,15 @@ async function handleMcpPost(
   research: ResearchService,
   plans: PlanService,
   experiments: ExperimentService,
+  discovery: DiscoveryService,
 ): Promise<void> {
-  const server = createProjectMcpServer(projects, research, plans, experiments);
+  const server = createProjectMcpServer(
+    projects,
+    research,
+    plans,
+    experiments,
+    discovery,
+  );
   // The SDK documents explicit `undefined` as its stateless mode, but its type
   // currently conflicts with exactOptionalPropertyTypes. Keep the compatibility
   // cast at this boundary so the service remains stateless per HTTP request.
@@ -129,6 +151,7 @@ function createProjectMcpServer(
   research: ResearchService,
   plans: PlanService,
   experiments: ExperimentService,
+  discovery: DiscoveryService,
 ): McpServer {
   const server = new McpServer(
     { name: 'paperloop', version: '0.1.0' },
@@ -142,7 +165,8 @@ function createProjectMcpServer(
     'projects_list',
     {
       title: 'List Paperloop projects',
-      description: 'List local Paperloop project profiles and their current context.',
+      description:
+        'List local Paperloop project profiles and their current context.',
       outputSchema: projectListResponseSchema,
       annotations: { readOnlyHint: true },
     },
@@ -178,7 +202,8 @@ function createProjectMcpServer(
     'projects_update',
     {
       title: 'Update a Paperloop project',
-      description: 'Update project goals, constraints, name, or description and append context provenance.',
+      description:
+        'Update project goals, constraints, name, or description and append context provenance.',
       inputSchema: updateProjectInputSchema,
       outputSchema: projectSchema,
       annotations: { destructiveHint: false },
@@ -205,7 +230,8 @@ function createProjectMcpServer(
     'projects_refresh_context',
     {
       title: 'Refresh project context',
-      description: 'Append a new context snapshot with current provenance and an optional repository revision.',
+      description:
+        'Append a new context snapshot with current provenance and an optional repository revision.',
       inputSchema: refreshContextInputSchema,
       outputSchema: projectSchema,
       annotations: { destructiveHint: false },
@@ -232,7 +258,7 @@ function createProjectMcpServer(
     {
       title: 'List project research',
       description:
-        'List supplied research documents and their current project-specific implementation briefs.',
+        'List the latest 100 project research documents and briefs. Use research_library_search for paginated older documents.',
       inputSchema: projectIdInputSchema,
       outputSchema: researchDocumentListResponseSchema,
       annotations: { readOnlyHint: true },
@@ -298,6 +324,7 @@ function createProjectMcpServer(
   );
 
   registerWorkflowMcp(server, plans, experiments);
+  registerDiscoveryMcp(server, discovery, research);
   return server;
 }
 
@@ -310,7 +337,10 @@ async function callProjectTool<T>(operation: () => T) {
       content: [
         {
           type: 'text' as const,
-          text: error instanceof Error ? error.message : 'Paperloop could not complete the operation.',
+          text:
+            error instanceof Error
+              ? error.message
+              : 'Paperloop could not complete the operation.',
         },
       ],
     };
@@ -318,7 +348,10 @@ async function callProjectTool<T>(operation: () => T) {
 }
 
 function structuredResult(value: unknown) {
-  const structuredContent = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  const structuredContent = JSON.parse(JSON.stringify(value)) as Record<
+    string,
+    unknown
+  >;
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(value) }],
     structuredContent,

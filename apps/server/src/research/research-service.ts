@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type {
@@ -16,7 +16,11 @@ import {
   implementationBriefs,
   projectResearchDocuments,
   researchDocuments,
+  researchVersions,
 } from '../storage/schema.js';
+
+import { normalizeIdentity } from './identity.js';
+import type { LibrarySearchRequest } from '@paperloop/contracts';
 
 export class ResearchDocumentNotFoundError extends Error {
   constructor(public readonly documentId: string) {
@@ -29,7 +33,58 @@ export class ResearchService {
   constructor(
     private readonly database: PaperloopDatabase,
     private readonly projects: ProjectService,
-  ) {}
+  ) {
+    // Backfill extracted text for documents indexed before FTS was introduced.
+    const rows = this.database.sqlite
+      .prepare(
+        "SELECT d.id, d.title, d.authors, d.extracted_content_reference AS reference FROM research_documents d JOIN research_search s ON s.document_id = d.id WHERE s.content = '' AND d.extracted_content_reference IS NOT NULL",
+      )
+      .all() as Array<{
+      id: string;
+      title: string;
+      authors: string;
+      reference: string;
+    }>;
+    for (const row of rows) {
+      let content: string;
+      try {
+        content = this.readExtractedContent(row.reference);
+      } catch {
+        const error =
+          'Stored extracted text is missing or unreadable. Fetch it again or restore the document artifact.';
+        this.database.db.transaction((tx) => {
+          tx.update(researchDocuments)
+            .set({
+              extractionStatus: 'failed',
+              extractionError: error,
+              extractedContentReference: null,
+            })
+            .where(eq(researchDocuments.id, row.id))
+            .run();
+          tx.update(researchVersions)
+            .set({
+              extractionStatus: 'failed',
+              extractionError: error,
+              contentReference: null,
+            })
+            .where(
+              and(
+                eq(researchVersions.documentId, row.id),
+                eq(researchVersions.contentReference, row.reference),
+              ),
+            )
+            .run();
+        });
+        continue;
+      }
+      this.indexDocument(
+        row.id,
+        row.title,
+        JSON.parse(row.authors) as string[],
+        content,
+      );
+    }
+  }
 
   ingest(
     projectId: string,
@@ -37,10 +92,9 @@ export class ResearchService {
   ): ResearchDocument {
     this.projects.get(projectId);
     const now = new Date();
-    const sourceReference = normalizeReference(
-      input.sourceKind,
-      input.sourceReference,
-    );
+    const identity = normalizeIdentity(input);
+    input = { ...input, ...identity };
+    const sourceReference = identity.sourceReference;
     const existing = this.database.db
       .select()
       .from(researchDocuments)
@@ -52,22 +106,67 @@ export class ResearchService {
       )
       .get();
     const documentId = existing?.id ?? randomUUID();
-    const extractedContentReference = input.extractedContent
-      ? this.writeExtractedContent(documentId, input.extractedContent)
-      : existing?.extractedContentReference ?? null;
+    const authors = input.authors.length
+      ? input.authors
+      : (existing?.authors ?? []);
+    const oldNumber = Number(existing?.sourceVersion?.replace(/^v/, ''));
+    const newNumber = Number(input.sourceVersion?.replace(/^v/, ''));
+    const olderVersion =
+      input.sourceKind === 'arxiv' &&
+      Number.isFinite(oldNumber) &&
+      Number.isFinite(newNumber) &&
+      newNumber < oldNumber;
+    const versionChanged = Boolean(
+      existing &&
+      input.sourceVersion &&
+      input.sourceVersion !== existing.sourceVersion,
+    );
+    const preserveExtraction = Boolean(
+      existing &&
+      !versionChanged &&
+      (input.extractionStatus === 'pending' ||
+        (existing.extractionStatus === 'complete' &&
+          input.extractionStatus === 'partial')),
+    );
+    const status =
+      olderVersion || preserveExtraction
+        ? existing!.extractionStatus
+        : input.extractionStatus;
+    const extractedContentReference =
+      olderVersion || preserveExtraction
+        ? existing!.extractedContentReference
+        : input.extractedContent
+          ? this.writeExtractedContent(documentId, input.extractedContent)
+          : versionChanged
+            ? null
+            : (existing?.extractedContentReference ?? null);
+    const sourceVersion = olderVersion
+      ? existing!.sourceVersion
+      : (input.sourceVersion ?? existing?.sourceVersion ?? null);
+    const extractionError =
+      olderVersion || preserveExtraction
+        ? existing!.extractionError
+        : (input.extractionError ?? null);
+
+    const historicalContentReference =
+      olderVersion && input.extractedContent
+        ? this.writeExtractedContent(documentId, input.extractedContent)
+        : null;
 
     this.database.db.transaction((transaction) => {
       if (existing) {
         transaction
           .update(researchDocuments)
           .set({
-            title: input.title,
-            canonicalUrl: input.canonicalUrl ?? existing.canonicalUrl,
-            authors: input.authors,
-            sourceVersion: input.sourceVersion ?? existing.sourceVersion,
-            extractionStatus: input.extractionStatus,
+            title: olderVersion ? existing!.title : input.title,
+            canonicalUrl: olderVersion
+              ? existing.canonicalUrl
+              : (input.canonicalUrl ?? existing.canonicalUrl),
+            authors,
+            sourceVersion,
+            extractionStatus: status,
             extractedContentReference,
-            extractionError: input.extractionError ?? null,
+            extractionError,
             retrievedAt: input.retrievedAt
               ? new Date(input.retrievedAt)
               : existing.retrievedAt,
@@ -80,15 +179,15 @@ export class ResearchService {
           .insert(researchDocuments)
           .values({
             id: documentId,
-            title: input.title,
+            title: olderVersion ? existing!.title : input.title,
             sourceKind: input.sourceKind,
             sourceReference,
             canonicalUrl: input.canonicalUrl ?? null,
-            authors: input.authors,
-            sourceVersion: input.sourceVersion ?? null,
-            extractionStatus: input.extractionStatus,
+            authors,
+            sourceVersion,
+            extractionStatus: status,
             extractedContentReference,
-            extractionError: input.extractionError ?? null,
+            extractionError,
             retrievedAt: input.retrievedAt ? new Date(input.retrievedAt) : null,
             createdAt: now,
             updatedAt: now,
@@ -96,6 +195,65 @@ export class ResearchService {
           .run();
       }
 
+      if (
+        olderVersion &&
+        !this.database.db
+          .select()
+          .from(researchVersions)
+          .where(
+            and(
+              eq(researchVersions.documentId, documentId),
+              eq(researchVersions.sourceVersion, input.sourceVersion!),
+            ),
+          )
+          .all()
+          .some(
+            (version) =>
+              version.contentReference === historicalContentReference &&
+              version.extractionStatus === input.extractionStatus,
+          )
+      ) {
+        transaction
+          .insert(researchVersions)
+          .values({
+            id: randomUUID(),
+            documentId,
+            sourceVersion: input.sourceVersion!,
+            extractionStatus: input.extractionStatus,
+            extractionError: input.extractionError ?? null,
+            contentReference: historicalContentReference,
+            retrievedAt: input.retrievedAt ?? now.toISOString(),
+          })
+          .run();
+      }
+      if (
+        !existing ||
+        sourceVersion !== existing.sourceVersion ||
+        status !== existing.extractionStatus ||
+        extractedContentReference !== existing.extractedContentReference ||
+        extractionError !== existing.extractionError
+      ) {
+        transaction
+          .insert(researchVersions)
+          .values({
+            id: randomUUID(),
+            documentId,
+            sourceVersion,
+            extractionStatus: status,
+            extractionError,
+            contentReference: extractedContentReference,
+            retrievedAt: input.retrievedAt ?? now.toISOString(),
+          })
+          .run();
+      }
+      this.indexDocument(
+        documentId,
+        olderVersion ? existing!.title : input.title,
+        authors,
+        extractedContentReference
+          ? this.readExtractedContent(extractedContentReference)
+          : '',
+      );
       transaction
         .insert(projectResearchDocuments)
         .values({
@@ -132,6 +290,7 @@ export class ResearchService {
       )
       .where(eq(projectResearchDocuments.projectId, projectId))
       .orderBy(desc(projectResearchDocuments.addedAt))
+      .limit(100)
       .all()
       .map(({ document, membership }) =>
         this.hydrate(projectId, document, membership),
@@ -200,9 +359,22 @@ export class ResearchService {
       .from(researchDocuments)
       .where(eq(researchDocuments.id, document.id))
       .get();
-    const content = row?.reference
-      ? this.readExtractedContent(row.reference)
-      : '';
+    let reference = row?.reference;
+    if (input.versionId) {
+      const version = this.database.db
+        .select()
+        .from(researchVersions)
+        .where(
+          and(
+            eq(researchVersions.id, input.versionId),
+            eq(researchVersions.documentId, documentId),
+          ),
+        )
+        .get();
+      if (!version) throw new ResearchDocumentNotFoundError(input.versionId);
+      reference = version.contentReference;
+    }
+    const content = reference ? this.readExtractedContent(reference) : '';
     const page = content.slice(input.offset, input.offset + input.limit);
     const nextOffset = input.offset + page.length;
     return {
@@ -212,6 +384,110 @@ export class ResearchService {
       nextOffset: nextOffset < content.length ? nextOffset : null,
       totalLength: content.length,
     };
+  }
+
+  searchLibrary(input: LibrarySearchRequest, projectId?: string) {
+    if (projectId) this.projects.get(projectId);
+    const tokens = input.query.match(/[\p{L}\p{N}_]+/gu) ?? [];
+    const match = tokens.map((token) => `"${token}"`).join(' AND ');
+    const conditions: string[] = [];
+    const bindings: (string | number)[] = [];
+    if (input.query && !match) return { documents: [], nextOffset: null };
+    if (match) {
+      conditions.push('research_search MATCH ?');
+      bindings.push(match);
+    }
+    if (projectId) {
+      conditions.push(
+        'EXISTS (SELECT 1 FROM project_research_documents m WHERE m.document_id = d.id AND m.project_id = ?)',
+      );
+      bindings.push(projectId);
+    }
+    const rows = this.database.sqlite
+      .prepare(
+        `SELECT d.id FROM research_documents d JOIN research_search ON research_search.document_id = d.id ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''} ORDER BY ${match ? 'bm25(research_search), ' : ''}d.created_at DESC, d.id LIMIT ? OFFSET ?`,
+      )
+      .all(...bindings, input.limit + 1, input.offset) as Array<{ id: string }>;
+    return {
+      documents: rows.slice(0, input.limit).map(({ id }) => {
+        const row = this.database.db
+          .select()
+          .from(researchDocuments)
+          .where(eq(researchDocuments.id, id))
+          .get()!;
+        return {
+          id: row.id,
+          title: row.title,
+          authors: row.authors,
+          sourceKind: row.sourceKind,
+          sourceReference: row.sourceReference,
+          sourceVersion: row.sourceVersion,
+          canonicalUrl: row.canonicalUrl,
+          extractionStatus: row.extractionStatus,
+        };
+      }),
+      nextOffset: rows.length > input.limit ? input.offset + input.limit : null,
+    };
+  }
+
+  attach(projectId: string, documentId: string): ResearchDocument {
+    this.projects.get(projectId);
+    if (
+      !this.database.db
+        .select()
+        .from(researchDocuments)
+        .where(eq(researchDocuments.id, documentId))
+        .get()
+    )
+      throw new ResearchDocumentNotFoundError(documentId);
+    this.database.db
+      .insert(projectResearchDocuments)
+      .values({
+        id: randomUUID(),
+        projectId,
+        documentId,
+        submittedBy: 'user',
+        addedAt: new Date(),
+      })
+      .onConflictDoNothing()
+      .run();
+    return this.get(projectId, documentId);
+  }
+
+  versions(projectId: string, documentId: string) {
+    this.get(projectId, documentId);
+    return this.database.db
+      .select()
+      .from(researchVersions)
+      .where(eq(researchVersions.documentId, documentId))
+      .orderBy(desc(researchVersions.retrievedAt))
+      .limit(100)
+      .all()
+      .map((row) => ({
+        id: row.id,
+        documentId,
+        sourceVersion: row.sourceVersion,
+        extractionStatus: row.extractionStatus,
+        extractionError: row.extractionError,
+        retrievedAt: row.retrievedAt,
+        contentAvailable: row.contentReference !== null,
+      }));
+  }
+
+  private indexDocument(
+    id: string,
+    title: string,
+    authors: string[],
+    content: string,
+  ): void {
+    this.database.sqlite
+      .prepare('DELETE FROM research_search WHERE document_id = ?')
+      .run(id);
+    this.database.sqlite
+      .prepare(
+        'INSERT INTO research_search (document_id, title, authors, content) VALUES (?, ?, ?, ?)',
+      )
+      .run(id, title, authors.join(' '), content);
   }
 
   private currentBrief(
@@ -258,7 +534,8 @@ export class ResearchService {
   }
 
   private writeExtractedContent(documentId: string, content: string): string {
-    const reference = join('research', documentId, 'extracted.txt');
+    const digest = createHash('sha256').update(content).digest('hex');
+    const reference = join('research', documentId, `${digest}.txt`);
     const path = join(this.database.dataDirectory, reference);
     const temporaryPath = `${path}.${randomUUID()}.tmp`;
     mkdirSync(dirname(path), { mode: 0o700, recursive: true });
@@ -288,16 +565,4 @@ function briefFromRow(
     sourceClaims: row.sourceClaims,
     createdAt: row.createdAt.toISOString(),
   };
-}
-
-function normalizeReference(
-  sourceKind: IngestResearchDocumentRequest['sourceKind'],
-  sourceReference: string,
-): string {
-  const trimmed = sourceReference.trim();
-  if (sourceKind !== 'url') return trimmed;
-
-  const url = new URL(trimmed);
-  url.hash = '';
-  return url.toString();
 }
