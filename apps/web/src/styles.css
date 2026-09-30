@@ -71,6 +71,11 @@ a { color: inherit; }
 .tabs a.active { color: var(--green); border-bottom-color: var(--green); }
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.8fr); gap: 20px; max-width: 1180px; }
 .overview-stack { display: grid; gap: 20px; }
+.experiment-layout { grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.6fr); }
+.experiment-layout .overview-stack { min-width: 0; align-content: start; }
+.experiment-layout .detail-panel { overflow-wrap: anywhere; }
+.experiment-layout table { display: block; max-width: 100%; overflow-x: auto; }
+.experiment-layout th, .experiment-layout td { padding: 8px; text-align: left; }
 .detail-panel, .form-panel, .state-card { border: 1px solid var(--line); border-radius: 18px; background: var(--paper); box-shadow: var(--shadow); }
 .detail-panel { padding: 28px; }
 .detail-panel h2 { margin: 3px 0 18px; font-size: 1.1rem; }

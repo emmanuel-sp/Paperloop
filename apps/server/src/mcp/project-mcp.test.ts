@@ -48,6 +48,21 @@ describe('project MCP endpoint', () => {
       'research_read_content',
       'research_ingest',
       'research_store_implementation_brief',
+      'evaluations_list',
+      'evaluations_draft',
+      'evaluations_get',
+      'implement_paper',
+      'experiments_list',
+      'experiments_get',
+      'experiments_claim',
+      'experiments_progress',
+      'experiments_reconcile',
+      'evaluations_run',
+      'evaluations_run_get',
+      'evaluations_cancel',
+      'evaluations_external_result',
+      'experiments_compare',
+      'evaluations_artifact',
     ]);
 
     const created = await client.callTool({

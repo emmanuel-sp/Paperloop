@@ -1,8 +1,16 @@
-import { mkdtempSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { describe, expect, it } from 'vitest';
 import {
   IncompatibleSchemaError,
@@ -39,6 +47,54 @@ describe('resolveDataDirectory', () => {
 });
 
 describe('openDatabase', () => {
+  it('upgrades the real research-era schema with a recoverable v3 backup', () => {
+    const dataDirectory = makeDataDirectory();
+    const migrationsFolder = mkdtempSync(
+      join(tmpdir(), 'paperloop-v3-migrations-'),
+    );
+    mkdirSync(join(migrationsFolder, 'meta'));
+    const journal = JSON.parse(
+      readFileSync(
+        new URL('../../drizzle/meta/_journal.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { entries: Array<{ tag: string }> };
+    journal.entries = journal.entries.slice(0, 3);
+    writeFileSync(
+      join(migrationsFolder, 'meta', '_journal.json'),
+      JSON.stringify(journal),
+    );
+    for (const entry of journal.entries)
+      copyFileSync(
+        new URL(`../../drizzle/${entry.tag}.sql`, import.meta.url),
+        join(migrationsFolder, `${entry.tag}.sql`),
+      );
+    const previous = new Database(join(dataDirectory, 'paperloop.sqlite'));
+    migrate(drizzle(previous), { migrationsFolder });
+    expect(previous.pragma('user_version', { simple: true })).toBe(3);
+    previous.exec(
+      "INSERT INTO app_state (key,value,updated_at) VALUES ('existing-state','preserved',0)",
+    );
+    previous.close();
+    const current = openDatabase({ dataDirectory });
+    expect(current.sqlite.pragma('user_version', { simple: true })).toBe(4);
+    expect(
+      current.sqlite
+        .prepare('SELECT value FROM app_state WHERE key = ?')
+        .pluck()
+        .get('existing-state'),
+    ).toBe('preserved');
+    const backup = new Database(current.backupPath!, { readonly: true });
+    expect(backup.pragma('user_version', { simple: true })).toBe(3);
+    expect(
+      backup
+        .prepare('SELECT value FROM app_state WHERE key = ?')
+        .pluck()
+        .get('existing-state'),
+    ).toBe('preserved');
+    backup.close();
+    current.close();
+  });
   it('enables foreign keys and WAL and runs the current migration', () => {
     const database = openDatabase({ dataDirectory: makeDataDirectory() });
 
@@ -96,9 +152,9 @@ describe('openDatabase', () => {
 
     expect(database.backupPath).toBeDefined();
     const backup = new Database(database.backupPath, { readonly: true });
-    expect(
-      backup.prepare('SELECT value FROM legacy_data').pluck().get(),
-    ).toBe('preserve-me');
+    expect(backup.prepare('SELECT value FROM legacy_data').pluck().get()).toBe(
+      'preserve-me',
+    );
     expect(backup.pragma('integrity_check', { simple: true })).toBe('ok');
     expect(backup.pragma('user_version', { simple: true })).toBe(0);
     backup.close();

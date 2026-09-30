@@ -4,6 +4,9 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { healthResponseSchema } from '@paperloop/contracts';
 import { ZodError } from 'zod';
+import { PlanService, WorkflowError } from './evaluations/plan-service.js';
+import { ExperimentService } from './experiments/experiment-service.js';
+import { registerWorkflowRoutes } from './experiments/workflow-routes.js';
 import { registerProjectMcp } from './mcp/project-mcp.js';
 import { registerProjectRoutes } from './projects/project-routes.js';
 import {
@@ -27,6 +30,8 @@ declare module 'fastify' {
     database: PaperloopDatabase;
     projects: ProjectService;
     research: ResearchService;
+    plans: PlanService;
+    experiments: ExperimentService;
   }
 }
 
@@ -51,6 +56,15 @@ export function createApp(options: CreateAppOptions = {}) {
   app.decorate('projects', projectService);
   const researchService = new ResearchService(database, projectService);
   app.decorate('research', researchService);
+  const plans = new PlanService(database, projectService);
+  const experiments = new ExperimentService(
+    database,
+    projectService,
+    researchService,
+    plans,
+  );
+  app.decorate('plans', plans);
+  app.decorate('experiments', experiments);
 
   if (options.webRoot) {
     void app.register(fastifyStatic, {
@@ -72,7 +86,8 @@ export function createApp(options: CreateAppOptions = {}) {
     if (origin && !isAllowedOrigin(origin, host)) {
       return reply.code(403).send({
         code: 'INVALID_ORIGIN',
-        message: 'The request origin does not match the local Paperloop service.',
+        message:
+          'The request origin does not match the local Paperloop service.',
       });
     }
 
@@ -84,6 +99,17 @@ export function createApp(options: CreateAppOptions = {}) {
 
     const bearer = request.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
     const cookie = readCookie(request.headers.cookie, 'paperloop_session');
+    if (
+      path?.endsWith('/approve') &&
+      !credentialsMatch(cookie, browserSession)
+    ) {
+      return reply
+        .code(403)
+        .send({
+          code: 'UI_APPROVAL_REQUIRED',
+          message: 'Approve this plan in the connected workbench.',
+        });
+    }
     const authenticated =
       path === '/api/v1/session'
         ? credentialsMatch(bearer, connectionSecret)
@@ -99,6 +125,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.addHook('onClose', async () => {
+    await experiments.close();
     database.close();
   });
 
@@ -116,9 +143,14 @@ export function createApp(options: CreateAppOptions = {}) {
 
   registerProjectRoutes(app, projectService);
   registerResearchRoutes(app, researchService);
-  registerProjectMcp(app, projectService, researchService);
+  registerWorkflowRoutes(app, plans, experiments);
+  registerProjectMcp(app, projectService, researchService, plans, experiments);
 
   app.setErrorHandler(async (error, request, reply) => {
+    if (error instanceof WorkflowError)
+      return reply
+        .code(error.statusCode)
+        .send({ code: error.code, message: error.message });
     if (error instanceof ZodError) {
       return reply.code(400).send({
         code: 'INVALID_REQUEST',
@@ -208,7 +240,10 @@ function isAllowedOrigin(origin: string, host: string): boolean {
   }
 }
 
-function readCookie(header: string | undefined, name: string): string | undefined {
+function readCookie(
+  header: string | undefined,
+  name: string,
+): string | undefined {
   return header
     ?.split(';')
     .map((part) => part.trim().split('='))

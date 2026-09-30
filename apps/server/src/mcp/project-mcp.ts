@@ -23,6 +23,9 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { ProjectService } from '../projects/project-service.js';
 import type { ResearchService } from '../research/research-service.js';
+import type { PlanService } from '../evaluations/plan-service.js';
+import type { ExperimentService } from '../experiments/experiment-service.js';
+import { registerWorkflowMcp } from './workflow-mcp.js';
 
 const projectIdInputSchema = z.object({ projectId: z.uuid() });
 const updateProjectInputSchema = z.object({
@@ -56,9 +59,11 @@ export function registerProjectMcp(
   app: FastifyInstance,
   projects: ProjectService,
   research: ResearchService,
+  plans: PlanService,
+  experiments: ExperimentService,
 ): void {
   app.post('/mcp', async (request, reply) => {
-    await handleMcpPost(request, reply, projects, research);
+    await handleMcpPost(request, reply, projects, research, plans, experiments);
   });
 
   const methodNotAllowed = async (_request: FastifyRequest, reply: FastifyReply) =>
@@ -76,8 +81,10 @@ async function handleMcpPost(
   reply: FastifyReply,
   projects: ProjectService,
   research: ResearchService,
+  plans: PlanService,
+  experiments: ExperimentService,
 ): Promise<void> {
-  const server = createProjectMcpServer(projects, research);
+  const server = createProjectMcpServer(projects, research, plans, experiments);
   // The SDK documents explicit `undefined` as its stateless mode, but its type
   // currently conflicts with exactOptionalPropertyTypes. Keep the compatibility
   // cast at this boundary so the service remains stateless per HTTP request.
@@ -120,6 +127,8 @@ async function handleMcpPost(
 function createProjectMcpServer(
   projects: ProjectService,
   research: ResearchService,
+  plans: PlanService,
+  experiments: ExperimentService,
 ): McpServer {
   const server = new McpServer(
     { name: 'paperloop', version: '0.1.0' },
@@ -288,6 +297,7 @@ function createProjectMcpServer(
       callProjectTool(() => research.storeBrief(projectId, documentId, brief)),
   );
 
+  registerWorkflowMcp(server, plans, experiments);
   return server;
 }
 
