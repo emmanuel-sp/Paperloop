@@ -4,6 +4,12 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
+import type {
+  EvaluationPlanDraft,
+  Experiment,
+  EvaluationRun,
+  Comparison,
+} from '@paperloop/contracts';
 
 export const appState = sqliteTable('app_state', {
   key: text('key').primaryKey(),
@@ -11,12 +17,78 @@ export const appState = sqliteTable('app_state', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
+export const evaluationPlans = sqliteTable(
+  'evaluation_plans',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id),
+    version: integer('version').notNull(),
+    configuration: text('configuration', { mode: 'json' })
+      .$type<EvaluationPlanDraft>()
+      .notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    approvedAt: text('approved_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('evaluation_plan_version_unique').on(
+      table.projectId,
+      table.version,
+    ),
+  ],
+);
+
+export const experiments = sqliteTable('experiments', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id')
+    .notNull()
+    .references(() => projects.id),
+  documentId: text('document_id')
+    .notNull()
+    .references(() => researchDocuments.id),
+  planId: text('plan_id')
+    .notNull()
+    .references(() => evaluationPlans.id),
+  status: text('status').notNull(),
+  payload: text('payload', { mode: 'json' }).$type<Experiment>().notNull(),
+});
+export const experimentJobs = sqliteTable('experiment_jobs', {
+  id: text('id').primaryKey(),
+  experimentId: text('experiment_id')
+    .notNull()
+    .references(() => experiments.id),
+  status: text('status').notNull(),
+  owner: text('owner'),
+  token: text('token'),
+  expiresAt: text('expires_at'),
+  progress: text('progress').notNull(),
+});
+export const evaluationRuns = sqliteTable('evaluation_runs', {
+  id: text('id').primaryKey(),
+  experimentId: text('experiment_id')
+    .notNull()
+    .references(() => experiments.id),
+  status: text('status').notNull(),
+  payload: text('payload', { mode: 'json' }).$type<EvaluationRun>().notNull(),
+});
+export const experimentComparisons = sqliteTable('experiment_comparisons', {
+  id: text('id').primaryKey(),
+  experimentId: text('experiment_id')
+    .notNull()
+    .references(() => experiments.id),
+  payload: text('payload', { mode: 'json' }).$type<Comparison>().notNull(),
+});
+
 export const projects = sqliteTable('projects', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   description: text('description').notNull(),
   objectives: text('objectives', { mode: 'json' }).$type<string[]>().notNull(),
-  constraints: text('constraints', { mode: 'json' }).$type<string[]>().notNull(),
+  constraints: text('constraints', { mode: 'json' })
+    .$type<string[]>()
+    .notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });

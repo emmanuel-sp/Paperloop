@@ -1,6 +1,6 @@
 # Paperloop
 
-Paperloop is a local workbench and MCP service for applying research to software projects and measuring the result. See [product scope](PRODUCT_SCOPE.md) and [technical design](TECHNICAL_DESIGN.md).
+Paperloop is a local workbench and MCP service for applying research to software projects and measuring the result. See [product scope](PRODUCT_SCOPE.md), [technical design](TECHNICAL_DESIGN.md), and the [supplied-paper experiment walkthrough](docs/EXPERIMENT_LOOP.md).
 
 ## Repository map
 
