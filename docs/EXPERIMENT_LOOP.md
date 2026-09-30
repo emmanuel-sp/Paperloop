@@ -31,7 +31,7 @@ Comparisons use absolute thresholds in each metric's units. A guardrail regressi
 
 ## Interrupted execution
 
-Nonzero exits, malformed/missing/stale output, timeouts, and cancellation are persisted as unsuccessful runs, never improvement evidence. Timeout/cancellation terminates the launched process group. Restart marks in-flight runs and owned implementation jobs interrupted; it never kills a saved PID. Inspect both workspaces and any surviving processes, then record specific evidence through the workbench or `experiments_reconcile` before claiming or executing again. Old ownership tokens cannot be reused.
+Nonzero exits, malformed/missing/stale output, timeouts, and cancellation are persisted as unsuccessful runs, never improvement evidence. Timeout/cancellation terminates the launched process group. Before reporting completion, the harness uses the Unix `ps` utility to confirm no live group member remains (unreaped zombies cannot execute). Confirmation is bounded; unavailable inspection or surviving processes mark the run and experiment interrupted, requiring reconciliation instead of claiming cancellation succeeded. Restart marks in-flight runs and owned implementation jobs interrupted; it never kills a saved PID. Inspect both workspaces and any surviving processes, then record specific evidence through the workbench or `experiments_reconcile` before claiming or executing again. Old ownership tokens cannot be reused.
 
 ## Verification
 

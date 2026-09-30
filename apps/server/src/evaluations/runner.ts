@@ -7,11 +7,12 @@ import {
   type EvaluationResult,
 } from '@paperloop/contracts';
 import { within } from '../experiments/workspaces.js';
+import { confirmProcessGroupStopped } from './process-group.js';
 
 export interface Execution {
   cancel(): void;
   done: Promise<{
-    status: 'completed' | 'failed' | 'timed_out' | 'cancelled';
+    status: 'completed' | 'failed' | 'timed_out' | 'cancelled' | 'interrupted';
     result: EvaluationResult | null;
     error: string | null;
     exitCode: number | null;
@@ -51,6 +52,7 @@ export function executePlan(
   let stdout = '';
   let stderr = '';
   let stop: 'cancelled' | 'timed_out' | undefined;
+  let closing = false;
   let killTimer: ReturnType<typeof setTimeout> | undefined;
   const kill = () => {
     if (!child.pid) return;
@@ -74,6 +76,7 @@ export function executePlan(
     stderr = (stderr + data.toString()).slice(-1_000_000);
   });
   const timeout = setTimeout(() => {
+    if (closing || stop) return;
     stop = 'timed_out';
     kill();
   }, command.timeoutMs);
@@ -82,7 +85,8 @@ export function executePlan(
     child.once('error', (error) => {
       spawnError = error;
     });
-    child.once('close', (exitCode) => {
+    child.once('close', async (exitCode) => {
+      closing = true;
       clearTimeout(timeout);
       if (killTimer) clearTimeout(killTimer);
       // Descendants may keep running after their leader exits.
@@ -93,18 +97,36 @@ export function executePlan(
           /* Group exited. */
         }
       }
-      writeFileSync(join(artifactDirectory, 'stdout.log'), stdout, {
-        mode: 0o600,
-      });
-      writeFileSync(join(artifactDirectory, 'stderr.log'), stderr, {
-        mode: 0o600,
-      });
+      const stopped =
+        !child.pid || (await confirmProcessGroupStopped(child.pid));
+      try {
+        writeFileSync(join(artifactDirectory, 'stdout.log'), stdout, {
+          mode: 0o600,
+        });
+        writeFileSync(join(artifactDirectory, 'stderr.log'), stderr, {
+          mode: 0o600,
+        });
+      } catch (failure) {
+        done({
+          status: 'interrupted',
+          result: null,
+          error: `Could not persist evaluation logs: ${failure instanceof Error ? failure.message : 'Unknown error'}. Inspect and reconcile before retrying.`,
+          exitCode,
+          artifacts: [],
+        });
+        return;
+      }
       let result: EvaluationResult | null = null;
       let error: string | null = null;
-      let status: 'completed' | 'failed' | 'timed_out' | 'cancelled' =
+      let status:
+        'completed' | 'failed' | 'timed_out' | 'cancelled' | 'interrupted' =
         stop ?? 'failed';
       const artifacts: string[] = ['stdout.log', 'stderr.log'];
-      if (spawnError) error = spawnError.message;
+      if (!stopped) {
+        status = 'interrupted';
+        error =
+          'Could not confirm the process group stopped. Inspect surviving processes and reconcile before retrying.';
+      } else if (spawnError) error = spawnError.message;
       else if (stop) error = `Evaluation ${stop}.`;
       else if (exitCode !== 0)
         error = `Evaluation exited with code ${exitCode}.`;
@@ -157,6 +179,7 @@ export function executePlan(
   return {
     done,
     cancel() {
+      if (closing || stop) return;
       stop = 'cancelled';
       kill();
     },
