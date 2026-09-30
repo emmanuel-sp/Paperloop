@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -567,7 +567,10 @@ describe('real subprocess evaluation failure paths', () => {
     async (_name, script, expected) => {
       const workspace = mkdtempSync(join(tmpdir(), 'paperloop-runner-'));
       writeFileSync(join(workspace, 'evaluate.py'), script);
-      const configuration = draft('evaluate.py', 150);
+      const configuration = draft(
+        'evaluate.py',
+        expected === 'timed_out' ? 150 : 2000,
+      );
       const plan = {
         id: randomUUID(),
         projectId: randomUUID(),
@@ -638,7 +641,13 @@ describe('real subprocess evaluation failure paths', () => {
       workspace,
       join(workspace, 'logs3'),
     );
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    for (
+      let attempt = 0;
+      attempt < 100 && !existsSync(join(workspace, 'child.pid'));
+      attempt++
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
     running.cancel();
     expect(await running.done).toMatchObject({
       status: 'cancelled',
