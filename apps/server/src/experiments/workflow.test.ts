@@ -11,9 +11,10 @@ import {
   ingestResearchDocumentRequestSchema,
   type EvaluationRun,
 } from '@paperloop/contracts';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { executePlan } from '../evaluations/runner.js';
+import * as processGroup from '../evaluations/process-group.js';
 import { evaluationRuns, experiments } from '../storage/schema.js';
 import { eq } from 'drizzle-orm';
 
@@ -119,6 +120,44 @@ async function settle(
 }
 
 describe('milestone 2 experiment loop', () => {
+  it('persists uncertain process cleanup as interrupted and blocks retries until reconciliation', async () => {
+    const { app, project, paper, plan } = await fixture();
+    app.plans.approve(plan.id, plan.fingerprint);
+    const id = app.experiments.create(project.id, {
+      documentId: paper.id,
+      planId: plan.id,
+    }).experiment.id;
+    const inspection = vi
+      .spyOn(processGroup, 'confirmProcessGroupStopped')
+      .mockResolvedValue(false);
+    try {
+      const run = await settle(
+        app,
+        app.experiments.startRun(id, 'baseline').id,
+      );
+      expect(run).toMatchObject({
+        status: 'interrupted',
+        result: null,
+        error: expect.stringContaining('Could not confirm'),
+      });
+      expect(app.experiments.get(id).status).toBe('interrupted');
+      expect(() => app.experiments.startRun(id, 'baseline')).toThrow(
+        /Reconcile/,
+      );
+      expect(() => app.experiments.claim(id, 'retry')).toThrow(
+        /reconciliation/,
+      );
+    } finally {
+      inspection.mockRestore();
+    }
+    app.experiments.reconcile(
+      id,
+      'Inspected the isolated workspaces and confirmed no surviving evaluator processes.',
+    );
+    expect(
+      (await settle(app, app.experiments.startRun(id, 'baseline').id)).status,
+    ).toBe('completed');
+  });
   it('connects UI-only approval, real MCP implementation, Python runs, comparison, and durable evidence', async () => {
     const { app, repository, dataDirectory, project, paper, plan } =
       await fixture();
@@ -654,7 +693,8 @@ describe('real subprocess evaluation failure paths', () => {
       result: null,
     });
     const pid = Number(readFileSync(join(workspace, 'child.pid'), 'utf8'));
-    // A killed child can briefly remain a zombie until its init reaper runs.
+    expect(pid).toBeGreaterThan(0);
+    // done now confirms no live group member; unreaped zombies are harmless.
     let state = '';
     try {
       state = readFileSync(`/proc/${pid}/stat`, 'utf8').split(' ')[2]!;
@@ -663,4 +703,74 @@ describe('real subprocess evaluation failure paths', () => {
     }
     expect(['', 'Z']).toContain(state);
   });
+
+  it.each(['cancelled', 'timed_out'] as const)(
+    'confirms %s for a SIGTERM-resistant descendant with detached output',
+    async (expected) => {
+      const workspace = mkdtempSync(
+        join(tmpdir(), 'paperloop-resistant-descendant-'),
+      );
+      writeFileSync(
+        join(workspace, 'descendant.py'),
+        `import os,pathlib,signal,time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+pathlib.Path('descendant.pid').write_text(str(os.getpid()))
+time.sleep(20)
+`,
+      );
+      writeFileSync(
+        join(workspace, 'evaluate.py'),
+        `import pathlib,subprocess,time
+subprocess.Popen(['/usr/bin/python3','descendant.py'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+while not pathlib.Path('descendant.pid').exists(): time.sleep(0.005)
+pathlib.Path('ready').write_text('ready')
+time.sleep(20)
+`,
+      );
+      const plan = {
+        id: randomUUID(),
+        projectId: randomUUID(),
+        version: 1,
+        configuration: draft(
+          'evaluate.py',
+          expected === 'timed_out' ? 500 : 5000,
+        ),
+        fingerprint: 'fixture',
+        approvedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      const execution = executePlan(plan, workspace, join(workspace, 'logs'));
+      cleanup.push(async () => {
+        execution.cancel();
+        await execution.done;
+      });
+      if (expected === 'cancelled') {
+        for (
+          let attempt = 0;
+          attempt < 100 && !existsSync(join(workspace, 'ready'));
+          attempt++
+        )
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(existsSync(join(workspace, 'ready'))).toBe(true);
+        execution.cancel();
+        execution.cancel(); // Repeated requests must not arm stale timers.
+      }
+      expect(await execution.done).toMatchObject({
+        status: expected,
+        result: null,
+      });
+      const pid = Number(
+        readFileSync(join(workspace, 'descendant.pid'), 'utf8'),
+      );
+      expect(pid).toBeGreaterThan(0);
+      let state = '';
+      try {
+        state = readFileSync(`/proc/${pid}/stat`, 'utf8').split(' ')[2]!;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+      expect(['', 'Z', 'X']).toContain(state);
+      execution.cancel(); // Completion must make later cancellation a no-op.
+    },
+  );
 });

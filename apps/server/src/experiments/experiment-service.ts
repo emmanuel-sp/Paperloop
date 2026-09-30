@@ -438,11 +438,23 @@ export class ExperimentService {
         artifactReferences: artifacts,
         finishedAt: new Date().toISOString(),
       };
-      this.database.db
-        .update(evaluationRuns)
-        .set({ status: completed.status, payload: completed })
-        .where(eq(evaluationRuns.id, run.id))
-        .run();
+      this.database.db.transaction((tx) => {
+        tx.update(evaluationRuns)
+          .set({ status: completed.status, payload: completed })
+          .where(eq(evaluationRuns.id, run.id))
+          .run();
+        if (completed.status === 'interrupted') {
+          this.save({
+            ...this.get(id),
+            status: 'interrupted',
+            reconciliation: null,
+          });
+          tx.update(experimentJobs)
+            .set({ status: 'interrupted' })
+            .where(eq(experimentJobs.experimentId, id))
+            .run();
+        }
+      });
       this.active.delete(run.id);
     });
     return run;
