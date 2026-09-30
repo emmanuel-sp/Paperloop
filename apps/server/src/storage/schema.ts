@@ -219,3 +219,66 @@ export const implementationBriefs = sqliteTable(
     ),
   ],
 );
+
+export const researchVersions = sqliteTable('research_versions', {
+  id: text('id').primaryKey(),
+  documentId: text('document_id')
+    .notNull()
+    .references(() => researchDocuments.id, { onDelete: 'cascade' }),
+  sourceVersion: text('source_version'),
+  extractionStatus: text('extraction_status').notNull(),
+  extractionError: text('extraction_error'),
+  contentReference: text('content_reference'),
+  retrievedAt: text('retrieved_at').notNull(),
+});
+export const projectSourceSelections = sqliteTable(
+  'project_source_selections',
+  {
+    projectId: text('project_id')
+      .primaryKey()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    selection: text('selection', { mode: 'json' })
+      .$type<import('@paperloop/contracts').SourceSelection>()
+      .notNull(),
+  },
+);
+export const discoveryScans = sqliteTable('discovery_scans', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  payload: text('payload', { mode: 'json' })
+    .$type<import('@paperloop/contracts').DiscoveryScan>()
+    .notNull(),
+});
+export const researchRecommendations = sqliteTable(
+  'research_recommendations',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    documentId: text('document_id')
+      .notNull()
+      .references(() => researchDocuments.id, { onDelete: 'cascade' }),
+    payload: text('payload', { mode: 'json' })
+      .$type<import('@paperloop/contracts').Recommendation>()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('recommendation_project_document_unique').on(
+      table.projectId,
+      table.documentId,
+    ),
+  ],
+);
+export const recommendationTriage = sqliteTable('recommendation_triage', {
+  id: text('id').primaryKey(),
+  recommendationId: text('recommendation_id')
+    .notNull()
+    .references(() => researchRecommendations.id, { onDelete: 'cascade' }),
+  state: text('state').notNull(),
+  reason: text('reason').notNull(),
+  experimentId: text('experiment_id'),
+  createdAt: text('created_at').notNull(),
+});

@@ -77,7 +77,9 @@ describe('openDatabase', () => {
     );
     previous.close();
     const current = openDatabase({ dataDirectory });
-    expect(current.sqlite.pragma('user_version', { simple: true })).toBe(4);
+    expect(current.sqlite.pragma('user_version', { simple: true })).toBe(
+      SUPPORTED_SCHEMA_VERSION,
+    );
     expect(
       current.sqlite
         .prepare('SELECT value FROM app_state WHERE key = ?')

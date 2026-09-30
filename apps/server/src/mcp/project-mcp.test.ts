@@ -26,11 +26,14 @@ describe('project MCP endpoint', () => {
     closeCallbacks.push(() => app.close());
 
     const client = new Client({ name: 'paperloop-test', version: '1.0.0' });
-    const transport = new StreamableHTTPClientTransport(new URL(`${address}/mcp`), {
-      requestInit: {
-        headers: { authorization: `Bearer ${connectionSecret}` },
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`${address}/mcp`),
+      {
+        requestInit: {
+          headers: { authorization: `Bearer ${connectionSecret}` },
+        },
       },
-    });
+    );
     await client.connect(transport as unknown as Transport);
     closeCallbacks.push(() => client.close());
 
@@ -63,6 +66,21 @@ describe('project MCP endpoint', () => {
       'evaluations_external_result',
       'experiments_compare',
       'evaluations_artifact',
+      'research_sources',
+      'research_project_sources',
+      'research_select_sources',
+      'research_search',
+      'research_scans',
+      'research_library_search',
+      'research_attach',
+      'research_versions',
+      'research_extract',
+      'research_fetch_url',
+      'research_pending_analysis',
+      'research_store_recommendation',
+      'research_recommendations',
+      'research_triage',
+      'research_triage_history',
     ]);
 
     const created = await client.callTool({

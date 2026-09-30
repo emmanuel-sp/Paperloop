@@ -7,15 +7,19 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 const nonEmptyText = z.string().trim().min(1);
 
 export const projectRepositorySchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('local'),
-    path: nonEmptyText,
-  }).strict(),
-  z.object({
-    kind: z.literal('github'),
-    owner: nonEmptyText,
-    repository: nonEmptyText,
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('local'),
+      path: nonEmptyText,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('github'),
+      owner: nonEmptyText,
+      repository: nonEmptyText,
+    })
+    .strict(),
 ]);
 export type ProjectRepository = z.infer<typeof projectRepositorySchema>;
 
@@ -80,11 +84,7 @@ export const projectListResponseSchema = z.object({
 });
 export type ProjectListResponse = z.infer<typeof projectListResponseSchema>;
 
-export const researchSourceKindSchema = z.enum([
-  'url',
-  'arxiv',
-  'reference',
-]);
+export const researchSourceKindSchema = z.enum(['url', 'arxiv', 'reference']);
 export type ResearchSourceKind = z.infer<typeof researchSourceKindSchema>;
 
 export const extractionStatusSchema = z.enum([
@@ -129,7 +129,8 @@ export const ingestResearchDocumentRequestSchema = z
     ) {
       context.addIssue({
         code: 'custom',
-        message: 'Extracted content is required for partial or complete extraction.',
+        message:
+          'Extracted content is required for partial or complete extraction.',
         path: ['extractedContent'],
       });
     }
@@ -206,6 +207,7 @@ export type ResearchDocumentListResponse = z.infer<
 >;
 
 export const readResearchContentRequestSchema = z.object({
+  versionId: z.uuid().optional(),
   offset: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().positive().max(20_000).default(10_000),
 });
@@ -221,3 +223,5 @@ export const researchContentPageSchema = z.object({
   totalLength: z.number().int().nonnegative(),
 });
 export type ResearchContentPage = z.infer<typeof researchContentPageSchema>;
+
+export * from './discovery.js';

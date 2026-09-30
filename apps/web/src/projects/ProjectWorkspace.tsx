@@ -1,5 +1,6 @@
 import type { Project } from '@paperloop/contracts';
 import { NavLink } from 'react-router';
+import { SourceWorkspace } from '../research/SourceWorkspace';
 import { ResearchWorkspace } from '../research/ResearchWorkspace';
 import { EvaluationWorkspace } from '../evaluations/EvaluationWorkspace';
 import { ExperimentWorkspace } from '../experiments/ExperimentWorkspace';
@@ -17,7 +18,10 @@ interface ProjectWorkspaceProps {
   project: Project;
 }
 
-export function ProjectWorkspace({ activeTab, project }: ProjectWorkspaceProps) {
+export function ProjectWorkspace({
+  activeTab,
+  project,
+}: ProjectWorkspaceProps) {
   return (
     <>
       <section className="project-header">
@@ -38,7 +42,9 @@ export function ProjectWorkspace({ activeTab, project }: ProjectWorkspaceProps) 
       {activeTab === 'overview' ? (
         <ProjectOverview project={project} />
       ) : activeTab === 'research' ? (
-        <ResearchWorkspace projectId={project.id} />
+        <ResearchWorkspace key={project.id} projectId={project.id} />
+      ) : activeTab === 'sources' ? (
+        <SourceWorkspace key={project.id} projectId={project.id} />
       ) : activeTab === 'evaluations' ? (
         <EvaluationWorkspace key={project.id} projectId={project.id} />
       ) : activeTab === 'experiments' ? (
@@ -46,8 +52,13 @@ export function ProjectWorkspace({ activeTab, project }: ProjectWorkspaceProps) 
       ) : (
         <section className="detail-panel placeholder-panel">
           <p className="eyebrow">Coming in this milestone sequence</p>
-          <h2>{tabs.find(([slug]) => slug === activeTab)?.[1] ?? 'Project detail'}</h2>
-          <p>This workspace route is ready for its feature workflow while preserving your project selection.</p>
+          <h2>
+            {tabs.find(([slug]) => slug === activeTab)?.[1] ?? 'Project detail'}
+          </h2>
+          <p>
+            This workspace route is ready for its feature workflow while
+            preserving your project selection.
+          </p>
         </section>
       )}
     </>
@@ -73,25 +84,60 @@ function ProjectOverview({ project }: { project: Project }) {
         <h2>What Paperloop knows</h2>
         <p className="context-summary">{project.currentContext.summary}</p>
         <dl className="provenance-list">
-          <div><dt>Source</dt><dd>{project.currentContext.sourceReference ?? 'Project description'}</dd></div>
-          <div><dt>Revision</dt><dd>{project.currentContext.repositoryRevision ?? 'Not available'}</dd></div>
-          <div><dt>Captured</dt><dd>{new Date(project.currentContext.capturedAt).toLocaleString()}</dd></div>
+          <div>
+            <dt>Source</dt>
+            <dd>
+              {project.currentContext.sourceReference ?? 'Project description'}
+            </dd>
+          </div>
+          <div>
+            <dt>Revision</dt>
+            <dd>
+              {project.currentContext.repositoryRevision ?? 'Not available'}
+            </dd>
+          </div>
+          <div>
+            <dt>Captured</dt>
+            <dd>
+              {new Date(project.currentContext.capturedAt).toLocaleString()}
+            </dd>
+          </div>
         </dl>
       </section>
       <div className="overview-stack">
-        <ListCard title="Objectives" items={project.objectives} empty="No objectives added yet." />
-        <ListCard title="Constraints" items={project.constraints} empty="No constraints added yet." />
+        <ListCard
+          title="Objectives"
+          items={project.objectives}
+          empty="No objectives added yet."
+        />
+        <ListCard
+          title="Constraints"
+          items={project.constraints}
+          empty="No constraints added yet."
+        />
       </div>
     </div>
   );
 }
 
-function ListCard({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+function ListCard({
+  title,
+  items,
+  empty,
+}: {
+  title: string;
+  items: string[];
+  empty: string;
+}) {
   return (
     <section className="detail-panel list-card">
       <h2>{title}</h2>
       {items.length > 0 ? (
-        <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul>
+        <ul>
+          {items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
       ) : (
         <p className="muted">{empty}</p>
       )}

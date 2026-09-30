@@ -165,3 +165,28 @@ legend { padding: 0 8px; font-size: 0.82rem; font-weight: 700; }
   .detail-panel, .form-panel, .state-card { animation: rise 260ms ease-out both; }
   @keyframes rise { from { opacity: 0; transform: translateY(7px); } }
 }
+
+.source-options { border: 0; padding: 0; margin: 0; display: grid; gap: 16px; }
+.source-options legend { font-weight: 700; margin-bottom: 16px; }
+.source-options label, .checkbox-label { display: flex; align-items: flex-start; gap: 12px; }
+.source-options input, .checkbox-label input { width: auto; margin-top: 4px; }
+.source-options span { display: grid; gap: 4px; }
+.source-options small { color: var(--muted); }
+.scan-outcomes { display: grid; gap: 20px; }
+.scan-outcomes p, .recommendation-card p { margin: 6px 0; }
+.recommendation-card { background: #f7f8fa; padding: 20px; border-radius: 12px; }
+.recommendation-card h3, .recommendation-card h4 { margin: 0; }
+.recommendation-card label { display: grid; gap: 8px; }
+.recommendation-card textarea { width: 100%; }
+.research-stack, .research-stack > *, .research-layout > * { min-width: 0; }
+.research-layout .form-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.research-layout input, .research-layout select, .research-layout textarea { min-width: 0; }
+.research-layout .detail-panel { overflow-wrap: anywhere; }
+.research-layout .form-actions { flex-wrap: wrap; gap: 8px; }
+.research-view-nav { display: flex; flex-wrap: wrap; gap: 12px; }
+.research-view-nav button[aria-pressed="true"] { background: var(--mint); color: var(--green); }
+.research-form label.checkbox-label { display: flex; }
+.recommendation-card { background: var(--canvas); }
+@media (min-width: 821px) { .research-detail { position: sticky; top: 90px; } }
+@media (max-width: 820px) { .research-layout .form-columns { grid-template-columns: 1fr; } }
+@media (min-width: 821px) { .research-detail { max-height: calc(100dvh - 110px); overflow-y: auto; } }
