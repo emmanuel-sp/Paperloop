@@ -2,6 +2,7 @@ import { createApp } from '../app.js';
 import { loadConfiguration, type ServerConfiguration } from './configuration.js';
 import { loadOrCreateConnectionSecret } from './connection-secret.js';
 import { acquireInstanceLock } from './instance-lock.js';
+import { BrowserLaunch } from './browser-launch.js';
 
 export interface StartServerOptions {
   configuration?: ServerConfiguration;
@@ -12,6 +13,8 @@ export interface RunningServer {
   address: string;
   close(): Promise<void>;
   connectionSecretPath: string;
+  browserLaunchUrl(): string | undefined;
+  cancelBrowserLaunch(): void;
 }
 
 export async function startServer(
@@ -24,7 +27,9 @@ export async function startServer(
     const connectionSecret = loadOrCreateConnectionSecret(
       configuration.dataDirectory,
     );
+    const browserLaunch = new BrowserLaunch();
     const app = createApp({
+      browserLaunch,
       connectionSecret: connectionSecret.value,
       storage: { dataDirectory: configuration.dataDirectory },
       ...(configuration.webRoot ? { webRoot: configuration.webRoot } : {}),
@@ -64,6 +69,9 @@ export async function startServer(
         address,
         close,
         connectionSecretPath: connectionSecret.filePath,
+        browserLaunchUrl: () =>
+          configuration.webRoot ? browserLaunch.issue(address) : undefined,
+        cancelBrowserLaunch: () => browserLaunch.clear(),
       };
     } catch (error) {
       await close();

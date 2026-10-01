@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { scheduleConfigSchema } from '../../packages/contracts/dist/index.js';
 import { createApp } from '../../apps/server/dist/app.js';
 import { GithubAccessError } from '../../apps/server/dist/projects/github-service.js';
+import { BrowserLaunch } from '../../apps/server/dist/runtime/browser-launch.js';
 const root = mkdtempSync(join(tmpdir(), 'paperloop-browser-'));
 const repository = join(root, 'repository');
 execFileSync('git', ['init', repository]);
@@ -39,7 +40,10 @@ const githubRepos = ['private-lab', 'public-lab'].map((name) => ({
   description: 'Controlled GitHub repository fixture', private: name === 'private-lab',
   default_branch: 'main', permissions: { pull: true },
 }));
+let launchTime = Date.now();
+const browserLaunch = new BrowserLaunch(() => launchTime);
 const app = createApp({
+  browserLaunch,
   githubApi: async (endpoint) => {
     const failures = {
       disconnected: ['GITHUB_DISCONNECTED', 'Sign in with GitHub CLI on the computer running Paperloop, then retry.', 503],
@@ -63,6 +67,13 @@ const app = createApp({
   dispatcher: false,
   storage: { dataDirectory: join(root, 'data') },
   webRoot: fileURLToPath(new URL('../../apps/web/dist', import.meta.url)),
+});
+// Test-only local launcher; production has no HTTP endpoint to mint capabilities.
+app.post('/__test/launch', async (request) => {
+  launchTime = Date.now();
+  const url = browserLaunch.issue('http://127.0.0.1:43187');
+  if (request.body?.expired) launchTime += 60_000;
+  return { url, projectId: project.id };
 });
 app.post('/__test/github', async (request) => {
   githubState = request.body.state;

@@ -27,10 +27,24 @@ import { ProjectWorkspace } from '../projects/ProjectWorkspace';
 
 const projectQueryKey = ['projects'] as const;
 
-export function App() {
+export function App({
+  browserLaunch,
+}: { browserLaunch?: Promise<void> | undefined }) {
+  const launchQuery = useQuery({
+    queryKey: ['browser-launch'],
+    queryFn: async () => {
+      await browserLaunch;
+      return true;
+    },
+    enabled: Boolean(browserLaunch),
+    retry: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
   const projectsQuery = useQuery({
     queryKey: projectQueryKey,
     queryFn: listProjects,
+    enabled: !browserLaunch || !launchQuery.isPending,
     retry: (count, error) =>
       !(error instanceof ApiError && error.status === 401) && count < 2,
   });
@@ -51,7 +65,11 @@ export function App() {
     projectsQuery.error instanceof ApiError &&
     projectsQuery.error.status === 401
   ) {
-    return <ConnectionScreen />;
+    return (
+      <ConnectionScreen
+        launchError={launchQuery.isError ? messageFromError(launchQuery.error) : undefined}
+      />
+    );
   }
 
   if (projectsQuery.isError) {
@@ -203,7 +221,9 @@ function ProjectPage({ projects }: { projects: Project[] }) {
   );
 }
 
-function ConnectionScreen() {
+function ConnectionScreen({
+  launchError,
+}: { launchError?: string | undefined }) {
   const [secret, setSecret] = useState('');
   const queryClient = useQueryClient();
   const mutation = useMutation({
@@ -228,10 +248,13 @@ function ConnectionScreen() {
         <p className="eyebrow">Local connection</p>
         <h1>Welcome to Paperloop</h1>
         <p>
-          Connect to your local workspace to explore research and measure what
-          works. Paste the connection secret from the file shown when Paperloop
-          starts.
+          Start Paperloop on this computer to open a connected workspace
+          automatically. If browser launch is unavailable, connect here using
+          the secret file shown in your terminal. Keep the secret on this computer.
         </p>
+        {launchError ? (
+          <p className="form-error" role="alert">{launchError}</p>
+        ) : null}
         <form onSubmit={submit}>
           <label>
             Connection secret

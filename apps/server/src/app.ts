@@ -8,6 +8,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { healthResponseSchema } from '@paperloop/contracts';
 import { ZodError } from 'zod';
+import type { BrowserLaunch } from './runtime/browser-launch.js';
 import { PlanService, WorkflowError } from './evaluations/plan-service.js';
 import { ExperimentService } from './experiments/experiment-service.js';
 import { registerWorkflowRoutes } from './experiments/workflow-routes.js';
@@ -55,6 +56,7 @@ declare module 'fastify' {
 }
 
 export interface CreateAppOptions {
+  browserLaunch?: BrowserLaunch;
   githubApi?: GithubApi;
   connectionSecret?: string;
   researchFetcher?: PublicFetcher;
@@ -74,6 +76,7 @@ export function createApp(options: CreateAppOptions = {}) {
   const browserSession = createHmac('sha256', connectionSecret)
     .update('paperloop-browser-session-v1')
     .digest('base64url');
+  const browserLaunch = options.browserLaunch;
 
   app.decorate('database', database);
   const projectService = new ProjectService(database);
@@ -145,6 +148,16 @@ export function createApp(options: CreateAppOptions = {}) {
     }
 
     const path = request.url.split('?', 1)[0];
+    if (path === '/api/v1/session/launch') {
+      reply.header('cache-control', 'no-store');
+      if (!origin) {
+        return reply.code(403).send({
+          code: 'INVALID_ORIGIN',
+          message: 'Open Paperloop from its trusted local launcher.',
+        });
+      }
+      return;
+    }
     const needsAuthentication =
       (path?.startsWith('/api/v1/') && path !== '/api/v1/health') ||
       path === '/mcp';
@@ -176,6 +189,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.addHook('onClose', async () => {
+    browserLaunch?.clear();
     await schedules.close();
     await experiments.close();
     database.close();
@@ -186,6 +200,23 @@ export function createApp(options: CreateAppOptions = {}) {
   );
 
   app.post('/api/v1/session', async (_request, reply) => {
+    reply.header('cache-control', 'no-store');
+    reply.header(
+      'set-cookie',
+      `paperloop_session=${browserSession}; Path=/; HttpOnly; SameSite=Strict`,
+    );
+    return reply.code(204).send();
+  });
+
+  app.post('/api/v1/session/launch', async (request, reply) => {
+    const token = (request.body as { token?: unknown } | null)?.token;
+    if (!browserLaunch?.consume(token, request.headers.origin)) {
+      return reply.code(401).send({
+        code: 'LAUNCH_EXPIRED',
+        message:
+          'This launch link is expired or already used. Restart Paperloop to open a new link, or connect manually.',
+      });
+    }
     reply.header(
       'set-cookie',
       `paperloop_session=${browserSession}; Path=/; HttpOnly; SameSite=Strict`,

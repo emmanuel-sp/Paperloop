@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/index.ts start --no-open",
     "db:generate": "drizzle-kit generate",
     "build": "tsc -p tsconfig.build.json",
     "start": "exec node dist/index.js",
