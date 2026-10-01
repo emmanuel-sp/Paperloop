@@ -722,6 +722,35 @@ describe('automation prerequisites and budgets', () => {
     expect(app.schedules.automate(project.id, input).experiment.id).toBe(
       detail.experiment.id,
     );
+    app.schedules.approveRule(project.id, { ...rule, enabled: false });
+    expect(() => app.experiments.claim(detail.experiment.id, 'agent')).toThrow(
+      /no longer authorizes/,
+    );
+    app.schedules.approveRule(project.id, {
+      ...rule,
+      categories: ['different'],
+    });
+    expect(() => app.experiments.claim(detail.experiment.id, 'agent')).toThrow(
+      /no longer authorizes/,
+    );
+    app.schedules.approveRule(project.id, rule);
+    const claimed = app.experiments.claim(detail.experiment.id, 'agent');
+    app.schedules.approveRule(project.id, { ...rule, goals: ['different'] });
+    expect(() =>
+      app.experiments.progress(
+        detail.experiment.id,
+        claimed.experiment.claimToken!,
+        'ready',
+        true,
+      ),
+    ).toThrow(/no longer authorizes/);
+    app.schedules.approveRule(project.id, rule);
+    app.experiments.progress(
+      detail.experiment.id,
+      claimed.experiment.claimToken!,
+      'ready',
+      true,
+    );
     const baseline = app.experiments.startRun(detail.experiment.id, 'baseline');
     for (
       let n = 0;

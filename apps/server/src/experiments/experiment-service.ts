@@ -1,4 +1,8 @@
-import { automationExperiments, automationRules } from '../storage/schema.js';
+import {
+  automationExperiments,
+  automationRules,
+  appState,
+} from '../storage/schema.js';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -235,6 +239,7 @@ export class ExperimentService {
   claim(id: string, owner: string): ExperimentDetail {
     this.database.db.transaction(() => {
       const experiment = this.get(id);
+      this.checkAutomationAuthorization(id);
       this.plans.requireApproved(experiment.planId);
       if (experiment.status !== 'pending')
         throw new WorkflowError(
@@ -274,6 +279,7 @@ export class ExperimentService {
     ready: boolean,
   ): ExperimentDetail {
     const experiment = this.get(id);
+    this.checkAutomationAuthorization(id);
     if (experiment.status !== 'claimed' || experiment.claimToken !== token)
       throw new WorkflowError(
         'INVALID_CLAIM',
@@ -672,23 +678,48 @@ export class ExperimentService {
       [...this.active.values()].map((execution) => execution.done),
     );
   }
-  private checkAutomationBudget(id: string): void {
+  private checkAutomationAuthorization(id: string) {
     const automation = this.database.db
       .select()
       .from(automationExperiments)
       .where(eq(automationExperiments.experimentId, id))
       .get();
-    if (!automation) return;
+    if (!automation) return null;
     const rule = this.database.db
       .select()
       .from(automationRules)
       .where(eq(automationRules.projectId, automation.projectId))
       .get()?.payload;
-    if (!rule?.enabled || rule.planId !== this.get(id).planId)
+    const reservation = this.database.db
+      .select()
+      .from(appState)
+      .where(
+        eq(
+          appState.key,
+          `automation-reservation:${automation.projectId}:${automation.recommendationId}`,
+        ),
+      )
+      .get();
+    const scope = reservation
+      ? (JSON.parse(reservation.value) as { goal: string; category: string })
+      : null;
+    if (
+      !rule?.enabled ||
+      rule.planId !== this.get(id).planId ||
+      !scope ||
+      !rule.goals.includes(scope.goal) ||
+      !rule.categories.includes(scope.category)
+    )
       throw new WorkflowError(
         'AUTOMATION_DISABLED',
         'The current automation rule no longer authorizes this experiment.',
       );
+    return { automation, rule };
+  }
+  private checkAutomationBudget(id: string): void {
+    const authorization = this.checkAutomationAuthorization(id);
+    if (!authorization) return;
+    const { automation, rule } = authorization;
     if (
       this.detail(id).runs.length >= Math.min(rule.maxRuns, automation.maxRuns)
     )

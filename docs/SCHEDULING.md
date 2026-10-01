@@ -37,7 +37,7 @@ Automation requires a current, non-dismissed/non-tested recommendation matching 
 
 A durable reservation consumes an experiment attempt transactionally before Git/filesystem preparation, which occurs outside the transaction. A failed or interrupted reservation remains visible and blocks further automation until inspection. `POST /api/v1/projects/:id/automation/reconcile` accepts `{ recommendationId, evidence }`; consumed attempts are retained. Startup attaches a completed workspace preparation to its retained budget, or marks uncertain preparation interrupted. Existing experiment execution/reconciliation remains in the experiment feature.
 
-Harness and externally submitted evaluation runs consume the same transactional per-experiment budget, including failed/cancelled runs. Tightening the rule takes effect on the next run; raising a current rule never silently raises an experiment's original retained run ceiling. Disabling/changing its rule blocks further automated evaluation. Unclaimed implementations wait for a coding agent. No flow automatically merges candidates.
+Harness and externally submitted evaluation runs consume the same transactional per-experiment budget, including failed/cancelled runs. Tightening the rule takes effect on the next run; raising a current rule never silently raises an experiment's original retained run ceiling. Disabling/changing its rule blocks further automated claims, progress, and evaluation; goal/category authorization is checked against the retained dispatch scope. Unclaimed implementations wait for a coding agent. No flow automatically merges candidates.
 
 ## Optional OpenAI/Anthropic analysis
 

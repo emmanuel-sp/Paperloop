@@ -21,6 +21,8 @@ export interface AutomationReservation {
   recommendationId: string;
   experimentId: string;
   maxRuns: number;
+  goal: string;
+  category: string;
   attempts: number;
   state: 'creating' | 'interrupted' | 'completed' | 'reconciled';
   evidence: string;
@@ -175,6 +177,8 @@ export class AutomationService {
         recommendationId: value.recommendationId,
         experimentId: randomUUID(),
         maxRuns: rule.maxRuns,
+        goal: value.goal,
+        category: value.category,
         attempts: (previous?.attempts ?? 0) + 1,
         state: 'creating',
         evidence: '',
