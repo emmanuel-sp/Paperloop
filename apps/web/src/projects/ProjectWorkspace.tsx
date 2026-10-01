@@ -1,3 +1,4 @@
+import { ScheduleWorkspace } from '../schedules/ScheduleWorkspace';
 import type { Project } from '@paperloop/contracts';
 import { NavLink } from 'react-router';
 import { SourceWorkspace } from '../research/SourceWorkspace';
@@ -44,7 +45,13 @@ export function ProjectWorkspace({
       ) : activeTab === 'research' ? (
         <ResearchWorkspace key={project.id} projectId={project.id} />
       ) : activeTab === 'sources' ? (
-        <SourceWorkspace key={project.id} projectId={project.id} />
+        <div className="research-stack">
+          <SourceWorkspace key={project.id} projectId={project.id} />
+          <ScheduleWorkspace
+            key={`schedule-${project.id}`}
+            projectId={project.id}
+          />
+        </div>
       ) : activeTab === 'evaluations' ? (
         <EvaluationWorkspace key={project.id} projectId={project.id} />
       ) : activeTab === 'experiments' ? (

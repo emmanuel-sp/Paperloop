@@ -225,3 +225,5 @@ export const researchContentPageSchema = z.object({
 export type ResearchContentPage = z.infer<typeof researchContentPageSchema>;
 
 export * from './discovery.js';
+
+export * from './schedules.js';

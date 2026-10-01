@@ -66,3 +66,7 @@ loopback.
 See the official [Codex MCP documentation](https://developers.openai.com/learn/docs-mcp)
 and [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp) for
 client-specific troubleshooting and additional scopes.
+
+## Scheduling
+
+See [Scheduling and automation](SCHEDULING.md) for native Codex/Claude handoffs, setup reports, observed check-ins, claim ownership, and bounded automation. Paperloop does not edit private agent configuration or install a native task merely by generating instructions.

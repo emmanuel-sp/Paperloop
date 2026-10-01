@@ -16,6 +16,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
+import { SUPPORTED_SCHEMA_VERSION } from '../storage/database.js';
 import { extractResource } from './extraction.js';
 import {
   SourceFetchError,
@@ -443,7 +444,7 @@ describe('document library and extraction', () => {
     const app = setup(undefined, dataDirectory);
     const owner = project(app);
     expect(app.database.sqlite.pragma('user_version', { simple: true })).toBe(
-      5,
+      SUPPORTED_SCHEMA_VERSION,
     );
     const backup = new Database(app.database.backupPath!, { readonly: true });
     expect(backup.pragma('user_version', { simple: true })).toBe(4);
