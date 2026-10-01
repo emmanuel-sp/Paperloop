@@ -162,6 +162,8 @@ Ask for essential project identity and repository selection. Infer a concise con
 
 Without a model API key, repository metadata, local context, public-source discovery, ingestion, saved research, existing recommendations, approved local evaluations, and recorded comparisons remain usable. Agent reasoning can provide analysis and drafts; otherwise collected material stays visible with analysis waiting. Do not fabricate recommendations, inferred context, measurements, or connection success. Show actionable unavailable-repository, source failure, missing-key, and waiting-for-agent states. No automatic paid fallback follows a missed agent check-in.
 
+The interaction foundation uses a dark research workspace with a prominent mission composer, content-sized text editors, contextual paper-to-experiment actions, and focused creation/configuration dialogs. Primary creation forms do not use click-to-expand panels. Waiting for an agent, observed work, and measured outcomes must remain visibly distinct.
+
 Reduce exposed options across sections: inherit shared preferences, lead with one focused action, and put advanced overrides, provenance, raw artifacts, and command configuration in optional details or deliberate dialogs. Each section needs its own typography, layout, copy, and populated/empty/loading/error states; a global stylesheet alone is insufficient.
 
 The comparison view is a central product feature. Show baseline versus candidate, metric changes, failed guardrails, provenance, and uncertainty together. Users should be able to understand both what changed and whether the evidence supports adopting it.

@@ -67,6 +67,7 @@ export function Dialog({
       aria-busy={busy}
       onKeyDown={(event) => {
         if (event.key !== 'Tab') return;
+        event.stopPropagation();
         const controls = Array.from(
           event.currentTarget.querySelectorAll<HTMLElement>(
             'button, a[href], input, select, textarea, summary, [tabindex]',
@@ -94,6 +95,7 @@ export function Dialog({
         }
       }}
       onCancel={(event) => {
+        event.stopPropagation();
         event.preventDefault();
         if (!busy) onClose();
       }}

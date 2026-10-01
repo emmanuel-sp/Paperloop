@@ -114,6 +114,8 @@ function SourceEditor({
         {catalog.collections.map((item) => (
           <label key={item.id}>
             <input
+              name="collection"
+              autoComplete="off"
               type="checkbox"
               checked={selection.collectionIds.includes(item.id)}
               onChange={() => toggle('collectionIds', item.id)}
@@ -137,6 +139,8 @@ function SourceEditor({
             return (
               <label key={item.id}>
                 <input
+                  name="source"
+                  autoComplete="off"
                   type="checkbox"
                   checked={enabled}
                   onChange={() =>
@@ -175,6 +179,8 @@ function SourceEditor({
           <label>
             Feed name
             <input
+              name="feedName"
+              autoComplete="off"
               required
               maxLength={200}
               value={feedName}
@@ -184,6 +190,8 @@ function SourceEditor({
           <label>
             Public feed URL
             <input
+              name="feedUrl"
+              autoComplete="off"
               type="url"
               required
               value={feedUrl}

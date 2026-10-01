@@ -237,7 +237,7 @@ function ConnectionScreen() {
             Connection secret
             <input
               autoComplete="off"
-              autoFocus
+              name="connectionSecret"
               onChange={(event) => setSecret(event.target.value)}
               required
               type="password"

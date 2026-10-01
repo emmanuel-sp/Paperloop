@@ -1,3 +1,5 @@
+import { Dialog } from '../components/Dialog';
+import { AutoTextarea } from '../components/AutoTextarea';
 import { AsyncState } from '../components/AsyncState';
 import { SectionHeading } from '../components/SectionHeading';
 import { useState, type FormEvent } from 'react';
@@ -8,7 +10,7 @@ import {
   artifactContentSchema,
   experimentDetailSchema,
 } from '@paperloop/contracts';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { WorkflowStatus, formatDate } from '../components/WorkflowStatus';
 import { listResearchDocuments, request } from '../api/client';
 
@@ -18,9 +20,14 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
   const selected = params.get('experiment') ?? '';
   const setSelected = (id: string) => {
     setArtifact(undefined);
-    setParams({ experiment: id });
+    setParams((previous) => {
+      const updated = new URLSearchParams(previous);
+      updated.set('experiment', id);
+      updated.delete('view');
+      return updated;
+    });
   };
-  const [paperId, setPaperId] = useState('');
+  const [paperId, setPaperId] = useState(params.get('paper') ?? '');
   const [planId, setPlanId] = useState('');
   const [copy, setCopy] = useState('');
   const [reconciliation, setReconciliation] = useState('');
@@ -118,15 +125,41 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
   return (
     <div className="overview-grid experiment-layout">
       <div className="overview-stack">
-        <details className="detail-panel create-panel">
-          <summary>New experiment</summary>
+        <Dialog
+          open={params.get('view') === 'prepare'}
+          title="Prepare experiment"
+          description="Review the research and approved evaluation before creating isolated workspaces."
+          busy={mutation.isPending}
+          onClose={() =>
+            setParams(
+              (previous) => {
+                const updated = new URLSearchParams(previous);
+                updated.delete('view');
+                return updated;
+              },
+              { replace: true },
+            )
+          }
+        >
           <p className="muted">
             Test a paper in an isolated copy of your project.
           </p>
+          {!plans.isPending && !plans.data?.some((plan) => plan.approvedAt) ? (
+            <p className="workflow-notice">
+              Approve an evaluation before preparing work.{' '}
+              <Link
+                to={`/projects/${projectId}/experiments?view=evaluation&paper=${paperId}`}
+              >
+                Review Evaluation
+              </Link>
+            </p>
+          ) : null}
           <form className="research-form" onSubmit={create}>
             <label>
               Paper
               <select
+                name="paperId"
+                autoComplete="off"
                 required
                 value={paperId}
                 onChange={(e) => setPaperId(e.target.value)}
@@ -142,6 +175,8 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
             <label>
               Approved evaluation plan
               <select
+                name="planId"
+                autoComplete="off"
                 required
                 value={planId}
                 onChange={(e) => setPlanId(e.target.value)}
@@ -158,15 +193,30 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
             </label>
             <label>
               Prepared copy path (non-Git projects)
-              <input value={copy} onChange={(e) => setCopy(e.target.value)} />
+              <input
+                name="isolatedCopy"
+                autoComplete="off"
+                value={copy}
+                onChange={(e) => setCopy(e.target.value)}
+              />
             </label>
-            <button disabled={mutation.isPending} className="button primary">
+            <button
+              disabled={
+                mutation.isPending ||
+                !plans.data?.some((plan) => plan.approvedAt)
+              }
+              className="button primary"
+            >
               Prepare experiment
             </button>
           </form>
-        </details>
+          {mutation.error ? <p role="alert">{mutation.error.message}</p> : null}
+        </Dialog>
         <section className="detail-panel">
-          <SectionHeading eyebrow="Work history" title="Experiments" />
+          <SectionHeading
+            title="Work history"
+            description="Changes your agent has worked on."
+          />
           {experiments.isPending ? (
             <p role="status">Loading experiments…</p>
           ) : null}
@@ -208,7 +258,13 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
             <section className="detail-panel">
               <WorkflowStatus value={detail.data.experiment.status} />
               <h2>{detail.data.plan.configuration.name}</h2>
-              <p>{detail.data.experiment.progress}</p>
+              <p role="status">{detail.data.experiment.progress}</p>
+              <Link
+                className="text-link"
+                to={`/projects/${projectId}/research?view=library&paper=${detail.data.experiment.documentId}`}
+              >
+                Open source paper
+              </Link>
               <details>
                 <summary>Workspaces & provenance</summary>
                 <p>Baseline: {detail.data.experiment.baselinePath}</p>
@@ -242,6 +298,8 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
                   <label>
                     Baseline run
                     <select
+                      name="baseline-run"
+                      autoComplete="off"
                       value={baseline.id}
                       onChange={(e) => setBaselineChoice(e.target.value)}
                     >
@@ -261,6 +319,8 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
                   <label>
                     Candidate run
                     <select
+                      name="candidate-run"
+                      autoComplete="off"
                       value={candidate.id}
                       onChange={(e) => setCandidateChoice(e.target.value)}
                     >
@@ -342,7 +402,9 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
                 >
                   <label>
                     Evidence that processes and workspaces were inspected
-                    <textarea
+                    <AutoTextarea
+                      name="reconciliation"
+                      autoComplete="off"
                       required
                       minLength={10}
                       value={reconciliation}
@@ -358,12 +420,43 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
             {detail.data.comparisons.map((comparison) => (
               <section
                 className="detail-panel comparison-panel"
+                data-outcome={comparison.outcome}
                 key={comparison.id}
               >
                 <p className="eyebrow">Comparison</p>
                 <h2>
                   <WorkflowStatus value={comparison.outcome} />
                 </h2>
+                {comparison.metrics[0] ? (
+                  <div className="comparison-highlight">
+                    <div>
+                      <span className="comparison-value">
+                        {comparison.metrics[0].percentChange === null
+                          ? '—'
+                          : `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(comparison.metrics[0].percentChange)}%`}
+                      </span>
+                      <p className="muted">
+                        Relative change in {comparison.metrics[0].name}
+                      </p>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>Baseline</dt>
+                        <dd>
+                          {comparison.metrics[0].baseline ?? 'Missing'}{' '}
+                          <small>{comparison.metrics[0].unit}</small>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Candidate</dt>
+                        <dd>
+                          {comparison.metrics[0].candidate ?? 'Missing'}{' '}
+                          <small>{comparison.metrics[0].unit}</small>
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                ) : null}
                 {comparison.reasons.map((reason) => (
                   <p key={reason}>{reason}</p>
                 ))}

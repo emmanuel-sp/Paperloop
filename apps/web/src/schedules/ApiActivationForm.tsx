@@ -31,6 +31,8 @@ export function ApiActivationForm({
       <label>
         Provider
         <select
+          name="provider"
+          autoComplete="off"
           value={provider}
           onChange={(event) => {
             const value = event.target.value as typeof provider;
@@ -50,6 +52,8 @@ export function ApiActivationForm({
       >
         {(attributes) => (
           <input
+            name="model"
+            autoComplete="off"
             {...attributes}
             required
             maxLength={200}
@@ -60,6 +64,8 @@ export function ApiActivationForm({
       </Field>
       <label className="checkbox-label">
         <input
+          name="paidAnalysisEnabled"
+          autoComplete="off"
           type="checkbox"
           checked={enabled}
           onChange={(e) => setEnabled(e.target.checked)}

@@ -4,9 +4,9 @@
   max-height: min(88dvh, 960px);
   margin: auto;
   padding: 0;
-  border: 0;
+  border: 1px solid #343430;
   border-radius: 16px;
-  background: var(--surface);
+  background: #0c0c0c;
   color: var(--ink);
   box-shadow: var(--shadow-dialog);
   overflow: hidden;
@@ -19,7 +19,7 @@
   width: min(880px, calc(100% - 32px));
 }
 .dialog::backdrop {
-  background: #20263666;
+  background: #00000099;
 }
 .dialog-heading {
   display: flex;
@@ -30,7 +30,7 @@
 }
 .dialog-heading h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: 30px;
 }
 .dialog-heading p {
   color: var(--muted);

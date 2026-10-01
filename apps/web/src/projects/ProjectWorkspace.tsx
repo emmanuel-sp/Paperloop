@@ -6,6 +6,7 @@ import { EvaluationWorkspace } from '../evaluations/EvaluationWorkspace';
 import { ExperimentWorkspace } from '../experiments/ExperimentWorkspace';
 
 import { Dialog } from '../components/Dialog';
+import { Icon } from '../components/Icon';
 import { SectionHeading } from '../components/SectionHeading';
 import { projectSections } from './navigation';
 import { ProjectActivity } from './ProjectActivity';
@@ -25,7 +26,7 @@ export function ProjectWorkspace({
     <>
       <header className="project-header">
         <div>
-          <p className="eyebrow">{project.name}</p>
+          <p className="eyebrow">Project workbench</p>
           <h1>
             {
               projectSections.find((section) => section.slug === activeTab)
@@ -43,6 +44,59 @@ export function ProjectWorkspace({
       </header>
       {activeTab === 'overview' ? (
         <div className="research-stack">
+          <section className="overview-lead">
+            <div className="overview-lead-copy">
+              <h2>
+                Research.
+                <br />
+                <span>Build.</span>
+                <br />
+                <span>Measure.</span>
+              </h2>
+              <p>{project.description || project.currentContext.summary}</p>
+              <Link
+                className="button primary"
+                to={`/projects/${project.id}/research`}
+              >
+                Discover research <Icon name="arrow" />
+              </Link>
+            </div>
+            <div className="overview-visual">
+              <img
+                src="/images/research-loop.png"
+                width="1280"
+                height="1280"
+                alt=""
+                fetchPriority="high"
+              />
+              <p className="visual-caption">
+                Ideas become experiments. Evidence closes the loop.
+              </p>
+            </div>
+          </section>
+          <nav className="overview-loop" aria-label="Research workflow">
+            <Link to={`/projects/${project.id}/research`}>
+              <Icon name="research" />
+              <span>
+                Discover<span>Find relevant ideas</span>
+              </span>
+              <Icon name="arrow" />
+            </Link>
+            <Link to={`/projects/${project.id}/research?view=recommendations`}>
+              <Icon name="agent" />
+              <span>
+                Assess<span>Review agent proposals</span>
+              </span>
+              <Icon name="arrow" />
+            </Link>
+            <Link to={`/projects/${project.id}/experiments`}>
+              <Icon name="experiments" />
+              <span>
+                Measure<span>Inspect the evidence</span>
+              </span>
+              <Icon name="arrow" />
+            </Link>
+          </nav>
           <ProjectActivity projectId={project.id} />
           <ProjectOverview project={project} />
         </div>
@@ -75,10 +129,14 @@ export function ProjectWorkspace({
             description="Review the exact metrics, inputs, and command before approving a version."
             wide
             onClose={() =>
-              setParams((previous) => {
-                previous.delete('view');
-                return previous;
-              })
+              setParams(
+                (previous) => {
+                  const updated = new URLSearchParams(previous);
+                  updated.delete('view');
+                  return updated;
+                },
+                { replace: true },
+              )
             }
           >
             <EvaluationWorkspace key={project.id} projectId={project.id} />

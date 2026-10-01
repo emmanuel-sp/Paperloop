@@ -47,21 +47,27 @@ test('navigation, paper evidence, keyboard focus, and narrow layouts', async ({
     ).toBeVisible();
     await expect(page.locator('#workspace')).toBeFocused();
   }
-  await page.setViewportSize({ width: 390, height: 844 });
-  for (const name of [
-    'Overview',
-    'Research',
-    'Schedules',
-    'Experiments',
-    'Settings',
-  ]) {
-    await page.getByRole('link', { name, exact: true }).click();
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
+  for (const width of [320, 390, 1024]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const name of [
+      'Overview',
+      'Research',
+      'Schedules',
+      'Experiments',
+      'Settings',
+    ]) {
+      await page.getByRole('link', { name, exact: true }).click();
+      await expect(
+        page.getByRole('heading', { name, exact: true, level: 1 }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+    }
   }
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.keyboard.press('Control+Home');
   await page.keyboard.press('Tab');
   // Explicitly exercise skip navigation independently of tab order after route focus.
@@ -83,14 +89,26 @@ test('browser approval through a complete paid-call-free Python comparison', asy
   await page.getByRole('button', { name: 'Approve version 1' }).click();
   await expect(page.getByText('Version 1 · Approved')).toBeVisible();
   await page.getByRole('button', { name: 'Close Evaluation' }).click();
-  await page.getByText('New experiment', { exact: true }).click();
+  await page.getByRole('link', { name: 'Research', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Saved research', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: /A focused retrieval technique/ })
+    .click();
+  await page.getByRole('link', { name: 'Start experiment' }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'Prepare experiment', exact: true }),
+  ).toBeVisible();
   await page
     .getByRole('combobox', { name: 'Paper', exact: true })
     .selectOption({ label: 'A focused retrieval technique' });
   await page
     .getByRole('combobox', { name: 'Approved evaluation plan', exact: true })
     .selectOption({ label: 'Retrieval quality v1' });
-  await page.getByRole('button', { name: 'Prepare experiment' }).click();
+  await page
+    .getByRole('button', { name: 'Prepare experiment', exact: true })
+    .click();
   await expect(page).toHaveURL(/experiment=/);
   const id = new URL(page.url()).searchParams.get('experiment');
   await expect(
@@ -458,5 +476,233 @@ test('shared loading, empty, and recoverable error states', async ({
   await page.getByRole('button', { name: 'Try again' }).click();
   await expect(
     page.getByRole('heading', { name: 'Overview', exact: true }),
+  ).toBeVisible();
+});
+
+test('research composer grows with a draft and supports focused URL import', async ({
+  page,
+}) => {
+  await connect(page);
+  await page.getByRole('link', { name: 'Research', exact: true }).click();
+  const composer = page.getByLabel('Research question', { exact: true });
+  const originalHeight = await composer.evaluate(
+    (element) => element.clientHeight,
+  );
+  await composer.fill(
+    Array.from({ length: 12 }, (_, i) => `Research direction ${i}`).join('\n'),
+  );
+  const expandedHeight = await composer.evaluate(
+    (element) => element.clientHeight,
+  );
+  expect(expandedHeight).toBeGreaterThan(originalHeight);
+  expect(expandedHeight).toBeLessThanOrEqual(280);
+  expect(
+    await composer.evaluate((element) => getComputedStyle(element).resize),
+  ).toBe('none');
+  await composer.fill('Improve retrieval grounding');
+  expect(await composer.evaluate((element) => element.clientHeight)).toBe(
+    originalHeight,
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(composer).toHaveValue('Improve retrieval grounding');
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  const trigger = page.getByRole('button', {
+    name: 'Fetch an article by URL',
+    exact: true,
+  });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', {
+    name: 'Fetch an article',
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  await dialog
+    .getByLabel('Fetch a paper or article URL')
+    .fill('https://example.org/research');
+  await page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+  await expect(trigger).toBeFocused();
+  await page.screenshot({
+    path: 'test-results/foundations/discovery-mobile.png',
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({
+    path: 'test-results/foundations/discovery-desktop.png',
+    fullPage: true,
+  });
+});
+
+test('schedule dialogs and nested evaluation forms contain focus and return to their actions', async ({
+  page,
+}) => {
+  await connect(page);
+  await page.getByRole('link', { name: 'Schedules', exact: true }).click();
+  const scheduleTrigger = page.getByRole('button', {
+    name: 'New schedule',
+    exact: true,
+  });
+  await scheduleTrigger.click();
+  const schedule = page.getByRole('dialog', {
+    name: 'New schedule',
+    exact: true,
+  });
+  await expect(schedule).toBeVisible();
+  await schedule
+    .getByLabel('Timezone', { exact: true })
+    .fill('America/Los_Angeles');
+  for (let i = 0; i < 16; i++) {
+    await page.keyboard.press(i < 8 ? 'Tab' : 'Shift+Tab');
+    expect(
+      await schedule.evaluate((element) =>
+        element.contains(document.activeElement),
+      ),
+    ).toBe(true);
+  }
+  await page.screenshot({
+    path: 'test-results/foundations/schedule-dialog-desktop.png',
+  });
+  await page.keyboard.press('Escape');
+  await expect(scheduleTrigger).toBeFocused();
+  await page.getByRole('link', { name: 'Experiments', exact: true }).click();
+  await page
+    .getByRole('link', { name: 'Review Evaluation', exact: true })
+    .click();
+  const evaluation = page.getByRole('dialog', {
+    name: 'Evaluation',
+    exact: true,
+  });
+  const createTrigger = evaluation.getByRole('button', {
+    name: 'Create an evaluation plan',
+    exact: true,
+  });
+  await createTrigger.click();
+  const creating = page.getByRole('dialog', {
+    name: 'Create an evaluation plan',
+    exact: true,
+  });
+  await expect(creating).toBeVisible();
+  for (let i = 0; i < 30; i++) {
+    await page.keyboard.press(i < 15 ? 'Tab' : 'Shift+Tab');
+    expect(
+      await creating.evaluate((element) =>
+        element.contains(document.activeElement),
+      ),
+    ).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(creating).not.toBeVisible();
+  await expect(evaluation).toBeVisible();
+  await expect(createTrigger).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(evaluation).not.toBeVisible();
+});
+
+test('library filters survive reload and schedule removal requires confirmation', async ({
+  page,
+}) => {
+  await connect(page);
+  await page.getByRole('link', { name: 'Research', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Saved research', exact: true })
+    .click();
+  await page
+    .getByLabel('Search title, authors, or extracted text')
+    .fill('retrieval');
+  await page
+    .getByRole('button', { name: 'Search library', exact: true })
+    .click();
+  await expect(page).toHaveURL(/libraryQuery=retrieval/);
+  await page.reload();
+  await expect(
+    page.getByLabel('Search title, authors, or extracted text'),
+  ).toHaveValue('retrieval');
+  await page.getByLabel('Search across all projects').check();
+  await expect(page).toHaveURL(/scope=all/);
+  await page.goBack();
+  await expect(page.getByLabel('Search across all projects')).not.toBeChecked();
+  await page.goForward();
+  await expect(page.getByLabel('Search across all projects')).toBeChecked();
+  await page.goBack();
+  await expect(page.getByLabel('Search across all projects')).not.toBeChecked();
+  await page.getByRole('link', { name: 'Schedules', exact: true }).click();
+  const remove = page
+    .getByRole('button', { name: 'Remove', exact: true })
+    .first();
+  await remove.click();
+  const dialog = page.getByRole('dialog', {
+    name: 'Remove schedule',
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  await dialog
+    .getByRole('button', { name: 'Keep schedule', exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await expect(remove).toBeFocused();
+  await remove.click();
+  await dialog
+    .getByRole('button', { name: 'Remove schedule', exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await expect(
+    page.getByText('Removed', { exact: true }).first(),
+  ).toBeVisible();
+  await expect(remove).toBeDisabled();
+});
+
+test('contextual preparation explains missing approval and returns to research', async ({
+  page,
+}) => {
+  await connect(page);
+  await page.route('**/api/v1/projects/*/evaluations', (route) =>
+    route.fulfill({ json: { plans: [] } }),
+  );
+  await page.getByRole('link', { name: 'Research', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Saved research', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: /A focused retrieval technique/ })
+    .click();
+  const paper = new URL(page.url()).searchParams.get('paper');
+  await page
+    .getByRole('link', { name: 'Start experiment', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog', {
+    name: 'Prepare experiment',
+    exact: true,
+  });
+  await expect(
+    dialog.getByRole('combobox', { name: 'Paper', exact: true }),
+  ).toHaveValue(paper!);
+  await expect(
+    dialog.getByRole('button', { name: 'Prepare experiment', exact: true }),
+  ).toBeDisabled();
+  await expect(
+    dialog.getByText('Approve an evaluation before preparing work.', {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await dialog
+    .getByRole('link', { name: 'Review Evaluation', exact: true })
+    .click();
+  await expect(
+    page.getByRole('dialog', { name: 'Evaluation', exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`paper=${paper}`));
+  await page.keyboard.press('Escape');
+  await page.goBack();
+  await expect(dialog).toBeVisible();
+  await page.goBack();
+  await expect(
+    page.getByRole('heading', {
+      name: 'A focused retrieval technique',
+      exact: true,
+    }),
   ).toBeVisible();
 });

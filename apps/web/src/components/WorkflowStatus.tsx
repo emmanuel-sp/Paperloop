@@ -1,4 +1,7 @@
 const labels: Record<string, string> = {
+  active: 'Active',
+  paused: 'Paused',
+  removed: 'Removed',
   pending: 'Waiting for agent',
   claimed: 'Agent working',
   ready: 'Ready to evaluate',

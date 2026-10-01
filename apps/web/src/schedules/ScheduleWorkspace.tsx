@@ -1,3 +1,4 @@
+import { Dialog } from '../components/Dialog';
 import { AsyncState } from '../components/AsyncState';
 import { SectionHeading } from '../components/SectionHeading';
 import { ScheduleEditor } from './ScheduleEditor';
@@ -30,6 +31,9 @@ export function ScheduleWorkspace({
   const [instructions, setInstructions] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
+  const [apiOpen, setApiOpen] = useState(false);
+  const [automationOpen, setAutomationOpen] = useState(false);
+  const [removing, setRemoving] = useState<Schedule | null>(null);
   const [editing, setEditing] = useState<Schedule | null>(null);
   const state = useQuery({
     queryKey: ['projects', projectId, 'schedules'],
@@ -79,6 +83,16 @@ export function ScheduleWorkspace({
       className={`research-stack ${view === 'settings' ? 'settings-layout' : 'schedule-layout'}`}
     >
       {view === 'settings' ? (
+        <div className="settings-intro">
+          <h2>
+            Connect.
+            <br />
+            <span>On your terms.</span>
+          </h2>
+          <p>Your coding agent. Your providers. Your limits.</p>
+        </div>
+      ) : null}
+      {view === 'settings' ? (
         <SectionHeading
           title="Agent & API"
           description="Choose how analysis happens. Connections and spending stay under your control."
@@ -120,10 +134,10 @@ export function ScheduleWorkspace({
                 className="button primary"
                 onClick={() => {
                   setEditing(null);
-                  setFormOpen(!formOpen);
+                  setFormOpen(true);
                 }}
               >
-                {formOpen ? 'Close form' : 'New schedule'}
+                New schedule
               </button>
             }
           />
@@ -138,7 +152,16 @@ export function ScheduleWorkspace({
               }}
             />
           ) : null}
-          {formOpen ? (
+          <Dialog
+            open={formOpen}
+            title={editing ? 'Edit schedule' : 'New schedule'}
+            description="Choose when research runs and who handles the work."
+            busy={action.isPending}
+            onClose={() => {
+              setFormOpen(false);
+              setEditing(null);
+            }}
+          >
             <ScheduleEditor
               key={editing?.id ?? 'new'}
               {...(editing ? { initial: editing.config } : {})}
@@ -166,7 +189,10 @@ export function ScheduleWorkspace({
                 )
               }
             />
-          ) : null}
+            {action.isError ? (
+              <p role="alert">{message(action.error)}</p>
+            ) : null}
+          </Dialog>
           {state.data?.schedules.length === 0 ? (
             <div className="empty-inline">
               <h3>Research at your own pace</h3>
@@ -190,10 +216,13 @@ export function ScheduleWorkspace({
                   {schedule.config.cadence === 'daily'
                     ? 'Daily research'
                     : 'Weekly research'}{' '}
-                  · {String(schedule.config.hour).padStart(2, '0')}:
-                  {String(schedule.config.minute).padStart(2, '0')}
                 </h3>
                 <WorkflowStatus value={schedule.state} />
+              </div>
+              <div className="schedule-time">
+                {String(schedule.config.hour).padStart(2, '0')}:
+                {String(schedule.config.minute).padStart(2, '0')}{' '}
+                <small>{schedule.config.timezone}</small>
               </div>
               <p className="schedule-setup">
                 {schedule.state} ·{' '}
@@ -267,12 +296,7 @@ export function ScheduleWorkspace({
                   className="button"
                   type="button"
                   disabled={action.isPending || schedule.state === 'removed'}
-                  onClick={() =>
-                    action.mutate({
-                      path: `/api/v1/schedules/${schedule.id}/state`,
-                      body: { state: 'removed' },
-                    })
-                  }
+                  onClick={() => setRemoving(schedule)}
                 >
                   Remove
                 </button>
@@ -340,14 +364,32 @@ export function ScheduleWorkspace({
               remain available; reasoning can wait for your coding agent.
             </p>
           )}
-          <ApiActivationForm
-            key={JSON.stringify(providers.data)}
-            activations={providers.data.activations}
-            pending={action.isPending}
-            onSave={(input) =>
-              action.mutate({ path: `${base}/analysis/approve`, body: input })
-            }
-          />
+          <button
+            className="button"
+            type="button"
+            onClick={() => setApiOpen(true)}
+          >
+            Configure API analysis
+          </button>
+          <Dialog
+            open={apiOpen}
+            title="API analysis"
+            description="Enable provider access deliberately. Credentials stay in the server environment."
+            busy={action.isPending}
+            onClose={() => setApiOpen(false)}
+          >
+            <ApiActivationForm
+              key={JSON.stringify(providers.data)}
+              activations={providers.data.activations}
+              pending={action.isPending}
+              onSave={(input) =>
+                action.mutate({ path: `${base}/analysis/approve`, body: input })
+              }
+            />
+            {action.isError ? (
+              <p role="alert">{message(action.error)}</p>
+            ) : null}
+          </Dialog>
         </section>
       ) : null}
       {view === 'settings' && rules.data && plans.data ? (
@@ -356,8 +398,20 @@ export function ScheduleWorkspace({
             title="Automation bounds"
             description="Review the limits before authorizing work to enter the queue."
           />
-          <details>
-            <summary>Review automation rules</summary>
+          <button
+            className="button"
+            type="button"
+            onClick={() => setAutomationOpen(true)}
+          >
+            Review automation rules
+          </button>
+          <Dialog
+            open={automationOpen}
+            title="Automation rules"
+            description="Choose what can run and the limits it must respect."
+            busy={action.isPending}
+            onClose={() => setAutomationOpen(false)}
+          >
             <AutomationRuleForm
               key={JSON.stringify(rules.data.rule)}
               base={base}
@@ -366,7 +420,10 @@ export function ScheduleWorkspace({
               pending={action.isPending}
               onAction={(value) => action.mutate(value)}
             />
-          </details>
+            {action.isError ? (
+              <p role="alert">{message(action.error)}</p>
+            ) : null}
+          </Dialog>
         </section>
       ) : null}
       {view === 'settings'
@@ -439,7 +496,43 @@ export function ScheduleWorkspace({
           ))}
         </section>
       ) : null}
-      {action.isError ? <p role="alert">{message(action.error)}</p> : null}
+      {action.isError && !formOpen && !apiOpen && !automationOpen ? (
+        <p role="alert">{message(action.error)}</p>
+      ) : null}
+      <Dialog
+        open={Boolean(removing)}
+        title="Remove schedule"
+        description="Future scans will stop. Existing research and recorded work stay in the project."
+        busy={action.isPending}
+        onClose={() => setRemoving(null)}
+      >
+        <div className="form-actions">
+          <button
+            className="button"
+            type="button"
+            onClick={() => setRemoving(null)}
+          >
+            Keep schedule
+          </button>
+          <button
+            className="button primary"
+            type="button"
+            disabled={action.isPending}
+            onClick={() =>
+              action.mutate(
+                {
+                  path: `/api/v1/schedules/${removing?.id}/state`,
+                  body: { state: 'removed' },
+                },
+                { onSuccess: () => setRemoving(null) },
+              )
+            }
+          >
+            Remove schedule
+          </button>
+        </div>
+        {action.isError ? <p role="alert">{message(action.error)}</p> : null}
+      </Dialog>
     </div>
   );
 }
@@ -463,6 +556,8 @@ function Reconcile({
     >
       <label htmlFor={`evidence-${jobId}`}>Reconciliation evidence</label>
       <input
+        name="evidence"
+        autoComplete="off"
         id={`evidence-${jobId}`}
         required
         maxLength={2000}
