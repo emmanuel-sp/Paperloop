@@ -2,6 +2,8 @@
 
 This is the operating plan for completing milestone 6, then using Paperloop to improve Paperloop. It records the owner's October 1, 2026 instructions so new task threads can resume without depending on a long chat.
 
+Current execution mode: the owner manually starts remote development tasks from mobile. No automatic development schedule has been registered. The scheduling guidance below is retained for a future switch; it does not restrict manually requested work to particular weekdays. Respect the personal quota reserve when telemetry is available and clearly disclose when it cannot be enforced.
+
 ## Authorization and boundaries
 
 The owner authorizes implementing existing issues, fixing defects, reviewing the application visually, creating branches and PRs, and merging verified changes. Improve usability within approved issue scope. Ask the owner before expanding functional scope, adding paid execution, or starting a proposed new milestone. Preserve Paperloop's exact evaluation approval and authentication boundaries; permission to develop and merge the repository does not approve application evaluation commands or model spending.
@@ -48,6 +50,7 @@ GitHub issues contain acceptance criteria; GitHub Project #2 contains status. Re
 | 3 | #41 | Dedicated evaluation context: inference, exact command approval, fingerprints, and truthful no-key states. Do not combine this approval-sensitive work with a broad UI cleanup. |
 | 4 | #42 / #47 | Group the experiment workspace and comparison presentation when cohesive. Split into successive PRs if one run cannot complete both. Preserve distinct criteria for progress, provenance, metrics, and inconclusive evidence. |
 | 5 | #44, then #43 | Settings preferences and schedule inheritance are one coherent area. Treat paid activation/MCP setup as a separate reviewed phase, then schedule UX. No paid tests without authorization. |
+| 5a | #50 | Persistent **Track** angles, schedule integration, feed triage, and automatic draft Evaluation after #39/#41/#43/#44. Dedicated cross-feature integration phase before the full demo. |
 | 6 | #45 | Overview after onboarding, Research, and Experiments have stable context and next actions. Dedicated populated-state design pass. |
 | 7 | #46, then #34 | Repeatable isolated ML demo, full journey, populated desktop/mobile visual inspection, failure and no-key states. Complete the roadmap only after every included issue is verified. |
 
@@ -56,6 +59,8 @@ Only one implementation PR should be active under this worker at a time. Existin
 ## Owner's design notes
 
 These notes refine milestone 6. Keep them visible during acceptance review rather than treating foundations PR #48 as final design approval.
+
+These requirements are also in GitHub: #36 owns application typography/transitions/progress, #39 owns the unified recommendation feed and triage, #41 owns automatic Evaluation suggestion, #43 owns inherited schedule integration, #50 owns persistent angle tracking, and #46 owns end-to-end verification. #34 records the additional issue and development grouping. #51 tracks the separate landing page as a future proposal requiring approval.
 
 - **Research uses “Track” intent.** Let the user provide or correct an angle, with inference from project context. Make source configuration secondary. Explain whether tracking is one-off, pending external setup, paused, or actually running. Do not imply an agent is monitoring continuously when there is no verified executor.
 - **Recommendations belong in the discovery feed.** Lead with relevant recommendations and their applicability/evidence. Allow rejection and acceptance; persist triage so accepted/rejected items are not recommended again for the same applicable context. Acceptance leads into the contextual experiment flow.
