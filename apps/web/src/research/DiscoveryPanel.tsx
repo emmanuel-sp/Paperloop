@@ -120,7 +120,9 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
         <div className="scan-outcomes">
           <div role="status" className="section-heading">
             <h3>{latest.documentIds.length} documents collected</h3>
-            {latest.analysisStatus === 'waiting_for_agent' ? (
+            {!latest.documentIds.length ? (
+              <span className="workflow-status">No papers to assess</span>
+            ) : latest.analysisStatus === 'waiting_for_agent' ? (
               <WorkflowStatus value="waiting_for_agent" />
             ) : (
               <span className="workflow-status status-completed">
@@ -128,7 +130,8 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
               </span>
             )}
           </div>
-          {latest.analysisStatus === 'waiting_for_agent' ? (
+          {latest.analysisStatus === 'waiting_for_agent' &&
+          latest.documentIds.length > 0 ? (
             <p role="status" className="workflow-notice">
               Papers are ready for assessment. Waiting for a coding agent to
               take the work; collecting papers does not start an agent.

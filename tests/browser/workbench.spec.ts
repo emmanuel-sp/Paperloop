@@ -454,6 +454,7 @@ test('populated section progress reports service work before agent activity', as
   );
   let release: () => void = () => {};
   let gate = new Promise<void>((resolve) => { release = resolve; });
+  let documentIds = [fixture.paperId];
   await page.route(`**/api/v1/projects/${fixture.projectId}/discovery/search`, async (route) => {
     await gate;
     await route.fulfill({ json: {
@@ -461,7 +462,7 @@ test('populated section progress reports service work before agent activity', as
       projectId: fixture.projectId,
       query: 'retrieval',
       createdAt: new Date().toISOString(),
-      documentIds: [fixture.paperId],
+      documentIds,
       outcomes: [],
       analysisStatus: 'waiting_for_agent',
     } });
@@ -472,10 +473,14 @@ test('populated section progress reports service work before agent activity', as
   try {
     await expect(page.getByRole('status').filter({ hasText: 'Agent analysis has not started.' })).toBeVisible();
     await expect(page.getByText('Agent working', { exact: true })).toHaveCount(0);
-    await page.screenshot({ path: 'test-results/foundations/discovery-working.png' });
+    await page.screenshot({ path: 'test-results/foundations/discovery-working.png', fullPage: true });
   } finally { release(); }
   await expect(page.getByRole('status').filter({ hasText: 'Waiting for a coding agent to take the work' })).toBeVisible();
-  await page.screenshot({ path: 'test-results/foundations/discovery-waiting.png' });
+  await page.screenshot({ path: 'test-results/foundations/discovery-waiting.png', fullPage: true });
+  documentIds = [];
+  await page.getByRole('button', { name: 'Search sources', exact: true }).click();
+  await expect(page.getByText('No papers to assess', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Waiting for a coding agent to take the work' })).toHaveCount(0);
 
   gate = new Promise<void>((resolve) => { release = resolve; });
   await page.route(`**/api/v1/projects/${fixture.projectId}/experiments`, async (route) => {
