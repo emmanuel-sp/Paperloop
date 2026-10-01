@@ -46,13 +46,7 @@ export function ProjectWorkspace({
         <div className="research-stack">
           <section className="overview-lead">
             <div className="overview-lead-copy">
-              <h2>
-                Research.
-                <br />
-                <span>Build.</span>
-                <br />
-                <span>Measure.</span>
-              </h2>
+              <h2>{project.name}</h2>
               <p>{project.description || project.currentContext.summary}</p>
               <Link
                 className="button primary"
@@ -69,9 +63,6 @@ export function ProjectWorkspace({
                 alt=""
                 fetchPriority="high"
               />
-              <p className="visual-caption">
-                Ideas become experiments. Evidence closes the loop.
-              </p>
             </div>
           </section>
           <nav className="overview-loop" aria-label="Research workflow">

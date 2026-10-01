@@ -207,9 +207,17 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
               }
               className="button primary"
             >
-              Prepare experiment
+              {mutation.isPending
+                ? 'Preparing experiment…'
+                : 'Prepare experiment'}
             </button>
           </form>
+          {mutation.isPending ? (
+            <p role="status">
+              Saving the experiment and preparing its workspace. Agent work
+              begins only after the task is claimed.
+            </p>
+          ) : null}
           {mutation.error ? <p role="alert">{mutation.error.message}</p> : null}
         </Dialog>
         <section className="detail-panel">

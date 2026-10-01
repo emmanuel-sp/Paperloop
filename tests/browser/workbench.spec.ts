@@ -382,6 +382,14 @@ test('populated section and dialog examples at desktop and narrow widths', async
     await expect(
       page.getByText('Paid analysis is disabled.', { exact: false }),
     ).toBeVisible();
+    await page.goto(`${base}/research`);
+    await expect(
+      page.getByRole('heading', { name: 'Discover research', exact: true }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: `test-results/foundations/discovery-${size}.png`,
+      fullPage: true,
+    });
     await page.goto(`${base}/research?view=sources`);
     await expect(
       page.getByRole('dialog', { name: 'Research sources', exact: true }),
@@ -423,6 +431,72 @@ test('populated section and dialog examples at desktop and narrow widths', async
       page.getByRole('heading', { name: 'Improvement measured' }),
     ).toBeVisible();
   }
+});
+
+test('populated section progress reports service work before agent activity', async ({
+  page,
+}) => {
+  await connect(page);
+  const response = await page.request.post('/__test/foundations');
+  expect(response.ok()).toBe(true);
+  const fixture = (await response.json()) as {
+    projectId: string;
+    paperId: string;
+  };
+  const base = `/projects/${fixture.projectId}`;
+  await page.route(`**/api/v1/projects/${fixture.projectId}/sources`, (route) =>
+    route.fulfill({
+      json: {
+        selection: {},
+        sources: [{ id: 'fixture', name: 'Fixture source', kind: 'arxiv', coverage: 'Synthetic browser fixture' }],
+      },
+    }),
+  );
+  let release: () => void = () => {};
+  let gate = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(`**/api/v1/projects/${fixture.projectId}/discovery/search`, async (route) => {
+    await gate;
+    await route.fulfill({ json: {
+      id: '11111111-1111-4111-8111-111111111111',
+      projectId: fixture.projectId,
+      query: 'retrieval',
+      createdAt: new Date().toISOString(),
+      documentIds: [fixture.paperId],
+      outcomes: [],
+      analysisStatus: 'waiting_for_agent',
+    } });
+  });
+  await page.goto(`${base}/research`);
+  await page.getByLabel('Research question').fill('retrieval');
+  await page.getByRole('button', { name: 'Search sources', exact: true }).click();
+  try {
+    await expect(page.getByRole('status').filter({ hasText: 'Agent analysis has not started.' })).toBeVisible();
+    await expect(page.getByText('Agent working', { exact: true })).toHaveCount(0);
+    await page.screenshot({ path: 'test-results/foundations/discovery-working.png' });
+  } finally { release(); }
+  await expect(page.getByRole('status').filter({ hasText: 'Waiting for a coding agent to take the work' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/foundations/discovery-waiting.png' });
+
+  gate = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(`**/api/v1/projects/${fixture.projectId}/experiments`, async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await gate;
+    await route.fulfill({ status: 503, json: { message: 'Controlled preparation failure' } });
+  });
+  await page.goto(`${base}/experiments?view=prepare&paper=${fixture.paperId}`);
+  const dialog = page.getByRole('dialog', { name: 'Prepare experiment', exact: true });
+  await dialog.getByRole('combobox', { name: 'Approved evaluation plan', exact: true }).selectOption({ label: 'Retrieval quality v1' });
+  await dialog.getByRole('button', { name: 'Prepare experiment', exact: true }).click();
+  try {
+    await expect(dialog.getByRole('status')).toContainText('Agent work begins only after the task is claimed.');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeVisible();
+    await page.screenshot({ path: 'test-results/foundations/preparation-working.png' });
+  } finally { release(); }
+  await expect(dialog.getByRole('alert')).toContainText('Controlled preparation failure');
+  await expect(dialog.getByRole('status')).toHaveCount(0);
+  await expect(dialog.getByRole('combobox', { name: 'Paper', exact: true })).toHaveValue(fixture.paperId);
+  await expect(dialog.getByRole('button', { name: 'Prepare experiment', exact: true })).toBeEnabled();
 });
 
 test('shared loading, empty, and recoverable error states', async ({

@@ -84,12 +84,8 @@ export function ScheduleWorkspace({
     >
       {view === 'settings' ? (
         <div className="settings-intro">
-          <h2>
-            Connect.
-            <br />
-            <span>On your terms.</span>
-          </h2>
-          <p>Your coding agent. Your providers. Your limits.</p>
+          <h2>Connections & execution</h2>
+          <p>Connect your coding agent and review optional paid analysis.</p>
         </div>
       ) : null}
       {view === 'settings' ? (
