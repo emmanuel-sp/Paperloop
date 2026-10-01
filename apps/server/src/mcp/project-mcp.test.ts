@@ -81,6 +81,21 @@ describe('project MCP endpoint', () => {
       'research_recommendations',
       'research_triage',
       'research_triage_history',
+      'schedules_list',
+      'schedules_create',
+      'schedules_update',
+      'schedules_state',
+      'schedules_handoff',
+      'schedules_check_in',
+      'schedules_due',
+      'schedules_scan_now',
+      'schedules_claim',
+      'schedules_submit',
+      'schedules_heartbeat',
+      'schedules_reconcile',
+      'schedules_automation',
+      'schedules_automate',
+
     ]);
 
     const created = await client.callTool({

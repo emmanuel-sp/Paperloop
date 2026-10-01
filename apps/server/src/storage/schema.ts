@@ -282,3 +282,79 @@ export const recommendationTriage = sqliteTable('recommendation_triage', {
   experimentId: text('experiment_id'),
   createdAt: text('created_at').notNull(),
 });
+
+export const schedules = sqliteTable('schedules', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  payload: text('payload', { mode: 'json' })
+    .$type<import('@paperloop/contracts').Schedule>()
+    .notNull(),
+});
+export const scheduleJobs = sqliteTable(
+  'schedule_jobs',
+  {
+    id: text('id').primaryKey(),
+    scheduleId: text('schedule_id')
+      .notNull()
+      .references(() => schedules.id, { onDelete: 'cascade' }),
+    revision: integer('revision').notNull(),
+    occurrence: text('occurrence').notNull(),
+    payload: text('payload', { mode: 'json' })
+      .$type<import('@paperloop/contracts').ScheduleJob>()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('schedule_occurrence_unique').on(
+      table.scheduleId,
+      table.revision,
+      table.occurrence,
+    ),
+  ],
+);
+export const automationRules = sqliteTable('automation_rules', {
+  projectId: text('project_id')
+    .primaryKey()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  payload: text('payload', { mode: 'json' })
+    .$type<import('@paperloop/contracts').AutomationRule>()
+    .notNull(),
+  approvedAt: text('approved_at').notNull(),
+});
+export const automationExperiments = sqliteTable(
+  'automation_experiments',
+  {
+    experimentId: text('experiment_id')
+      .primaryKey()
+      .references(() => experiments.id, { onDelete: 'cascade' }),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    recommendationId: text('recommendation_id')
+      .notNull()
+      .references(() => researchRecommendations.id),
+    maxRuns: integer('max_runs').notNull(),
+  },
+  (table) => [
+    uniqueIndex('automated_recommendation_unique').on(
+      table.projectId,
+      table.recommendationId,
+    ),
+  ],
+);
+export const apiActivations = sqliteTable(
+  'api_activations',
+  {
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    payload: text('payload', { mode: 'json' })
+      .$type<import('@paperloop/contracts').ApiActivation>()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('api_activation_unique').on(table.projectId, table.provider),
+  ],
+);

@@ -1,3 +1,4 @@
+import { automationExperiments, automationRules } from '../storage/schema.js';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -161,7 +162,11 @@ export class ExperimentService {
                   ],
     };
   }
-  create(projectId: string, input: ExperimentRequest): ExperimentDetail {
+  create(
+    projectId: string,
+    input: ExperimentRequest,
+    reservedId?: string,
+  ): ExperimentDetail {
     const project = this.projects.get(projectId);
     const paper = this.research.get(projectId, input.documentId);
     const plan = this.plans.requireApproved(input.planId);
@@ -182,7 +187,7 @@ export class ExperimentService {
         'LOCAL_REPOSITORY_REQUIRED',
         'Register an available local repository before preparing an experiment.',
       );
-    const id = randomUUID();
+    const id = reservedId ?? randomUUID();
     const workspace = prepareWorkspaces(
       join(this.database.dataDirectory, 'experiments', id),
       project.repository.path,
@@ -345,6 +350,7 @@ export class ExperimentService {
     return this.detail(id);
   }
   startRun(id: string, role: 'baseline' | 'candidate'): EvaluationRun {
+    this.checkAutomationBudget(id);
     const experiment = this.get(id);
     const plan = this.plans.requireApproved(experiment.planId);
     if (
@@ -396,15 +402,18 @@ export class ExperimentService {
       finishedAt: null,
       artifactReferences: [],
     };
-    this.database.db
-      .insert(evaluationRuns)
-      .values({
-        id: run.id,
-        experimentId: id,
-        status: run.status,
-        payload: run,
-      })
-      .run();
+    this.database.db.transaction(() => {
+      this.checkAutomationBudget(id);
+      this.database.db
+        .insert(evaluationRuns)
+        .values({
+          id: run.id,
+          experimentId: id,
+          status: run.status,
+          payload: run,
+        })
+        .run();
+    });
     let execution: Execution;
     try {
       execution = executePlan(
@@ -468,6 +477,7 @@ export class ExperimentService {
   ): EvaluationRun {
     const experiment = this.get(id);
     const plan = this.plans.requireApproved(experiment.planId);
+    this.checkAutomationBudget(id);
     const result = evaluationResultSchema.parse(input);
     const run: EvaluationRun = {
       id: randomUUID(),
@@ -488,15 +498,18 @@ export class ExperimentService {
       finishedAt: new Date().toISOString(),
       artifactReferences: [],
     };
-    this.database.db
-      .insert(evaluationRuns)
-      .values({
-        id: run.id,
-        experimentId: id,
-        status: run.status,
-        payload: run,
-      })
-      .run();
+    this.database.db.transaction(() => {
+      this.checkAutomationBudget(id);
+      this.database.db
+        .insert(evaluationRuns)
+        .values({
+          id: run.id,
+          experimentId: id,
+          status: run.status,
+          payload: run,
+        })
+        .run();
+    });
     return run;
   }
   run(id: string): EvaluationRun {
@@ -658,6 +671,31 @@ export class ExperimentService {
     await Promise.allSettled(
       [...this.active.values()].map((execution) => execution.done),
     );
+  }
+  private checkAutomationBudget(id: string): void {
+    const automation = this.database.db
+      .select()
+      .from(automationExperiments)
+      .where(eq(automationExperiments.experimentId, id))
+      .get();
+    if (!automation) return;
+    const rule = this.database.db
+      .select()
+      .from(automationRules)
+      .where(eq(automationRules.projectId, automation.projectId))
+      .get()?.payload;
+    if (!rule?.enabled || rule.planId !== this.get(id).planId)
+      throw new WorkflowError(
+        'AUTOMATION_DISABLED',
+        'The current automation rule no longer authorizes this experiment.',
+      );
+    if (
+      this.detail(id).runs.length >= Math.min(rule.maxRuns, automation.maxRuns)
+    )
+      throw new WorkflowError(
+        'RUN_LIMIT',
+        'The approved evaluation run budget is exhausted.',
+      );
   }
   private save(experiment: Experiment): void {
     this.database.db

@@ -1,3 +1,5 @@
+import type { ScheduleService } from '../schedules/schedule-service.js';
+import { registerScheduleMcp } from './schedule-mcp.js';
 import {
   createProjectRequestSchema,
   ingestResearchDocumentRequestSchema,
@@ -65,6 +67,7 @@ export function registerProjectMcp(
   plans: PlanService,
   experiments: ExperimentService,
   discovery: DiscoveryService,
+  schedules?: ScheduleService,
 ): void {
   app.post('/mcp', async (request, reply) => {
     await handleMcpPost(
@@ -75,6 +78,7 @@ export function registerProjectMcp(
       plans,
       experiments,
       discovery,
+      schedules,
     );
   });
 
@@ -99,6 +103,7 @@ async function handleMcpPost(
   plans: PlanService,
   experiments: ExperimentService,
   discovery: DiscoveryService,
+  schedules?: ScheduleService,
 ): Promise<void> {
   const server = createProjectMcpServer(
     projects,
@@ -106,6 +111,7 @@ async function handleMcpPost(
     plans,
     experiments,
     discovery,
+    schedules,
   );
   // The SDK documents explicit `undefined` as its stateless mode, but its type
   // currently conflicts with exactOptionalPropertyTypes. Keep the compatibility
@@ -152,6 +158,7 @@ function createProjectMcpServer(
   plans: PlanService,
   experiments: ExperimentService,
   discovery: DiscoveryService,
+  schedules?: ScheduleService,
 ): McpServer {
   const server = new McpServer(
     { name: 'paperloop', version: '0.1.0' },
@@ -325,6 +332,7 @@ function createProjectMcpServer(
 
   registerWorkflowMcp(server, plans, experiments);
   registerDiscoveryMcp(server, discovery, research);
+  if (schedules) registerScheduleMcp(server, schedules);
   return server;
 }
 

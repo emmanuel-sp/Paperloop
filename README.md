@@ -1,6 +1,6 @@
 # Paperloop
 
-Paperloop is a local workbench and MCP service for applying research to software projects and measuring the result. See [product scope](PRODUCT_SCOPE.md), [technical design](TECHNICAL_DESIGN.md), the [supplied-paper experiment walkthrough](docs/EXPERIMENT_LOOP.md), and [research discovery](docs/DISCOVERY.md).
+Paperloop is a local workbench and MCP service for applying research to software projects and measuring the result. See [product scope](PRODUCT_SCOPE.md), [technical design](TECHNICAL_DESIGN.md), the [supplied-paper experiment walkthrough](docs/EXPERIMENT_LOOP.md), and [research discovery](docs/DISCOVERY.md), and [scheduling and automation](docs/SCHEDULING.md).
 
 ## Repository map
 
@@ -39,7 +39,7 @@ Only one service process may own a data directory at a time. `SIGINT` and `SIGTE
 
 Authenticated clients manage project profiles through `/api/v1/projects`. Profiles retain descriptions, objectives, constraints, and either a local directory or read-only GitHub repository reference. Repository credentials are intentionally not accepted by project contracts; integrations obtain them from separate local configuration. Every profile change, repository registration, or explicit context refresh appends a context version with its source, capture time, and Git revision when available. `GET /api/v1/projects/:id/context` returns that provenance history newest-first.
 
-The workbench opens with the local connection exchange, then keeps project selection and the active section in the URL. It includes persistent project navigation, setup for description-only/local/GitHub projects, context provenance, research discovery and triage, a reusable document library, approved evaluation plans, isolated experiments, and selectable research sources. Project reads and mutations use the real API with visible loading, empty, validation, connection, and retry states.
+The workbench opens with the local connection exchange, then keeps project selection and the active section in the URL. It includes persistent project navigation, setup for description-only/local/GitHub projects, context provenance, research discovery and triage, a reusable document library, approved evaluation plans, isolated experiments, selectable research sources, durable schedules, and explicitly activated API analysis. Project reads and mutations use the real API with visible loading, empty, validation, connection, and retry states.
 
 Coding agents use the same project service through the authenticated Streamable
 HTTP endpoint at `http://127.0.0.1:3000/mcp`. It exposes structured tools for

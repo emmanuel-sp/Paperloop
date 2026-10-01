@@ -1,3 +1,7 @@
+import { ScheduleService } from './schedules/schedule-service.js';
+import { registerScheduleRoutes } from './schedules/schedule-routes.js';
+import { AnalysisService } from './analysis/analysis-service.js';
+import type { ModelExecutor } from './analysis/providers.js';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { resolve } from 'node:path';
 import fastifyStatic from '@fastify/static';
@@ -39,6 +43,8 @@ declare module 'fastify' {
     discovery: DiscoveryService;
     plans: PlanService;
     experiments: ExperimentService;
+    schedules: ScheduleService;
+    analysis: AnalysisService;
   }
 }
 
@@ -46,6 +52,9 @@ export interface CreateAppOptions {
   connectionSecret?: string;
   researchFetcher?: PublicFetcher;
   logger?: boolean;
+  modelExecutor?: ModelExecutor;
+  scheduleNow?: () => Date;
+  dispatcher?: boolean;
   storage?: OpenDatabaseOptions;
   webRoot?: string;
 }
@@ -80,6 +89,28 @@ export function createApp(options: CreateAppOptions = {}) {
   );
   app.decorate('plans', plans);
   app.decorate('experiments', experiments);
+  const analysis = new AnalysisService(
+    database,
+    projectService,
+    researchService,
+    discovery,
+    plans,
+    options.modelExecutor,
+  );
+  const schedules = new ScheduleService(
+    database,
+    projectService,
+    discovery,
+    plans,
+    experiments,
+    analysis,
+    options.scheduleNow,
+  );
+  app.decorate('analysis', analysis);
+  app.decorate('schedules', schedules);
+  app.addHook('onReady', async () => {
+    if (options.dispatcher !== false) schedules.start();
+  });
 
   if (options.webRoot) {
     void app.register(fastifyStatic, {
@@ -138,6 +169,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.addHook('onClose', async () => {
+    await schedules.close();
     await experiments.close();
     database.close();
   });
@@ -158,6 +190,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerResearchRoutes(app, researchService);
   registerDiscoveryRoutes(app, discovery, researchService);
   registerWorkflowRoutes(app, plans, experiments);
+  registerScheduleRoutes(app, schedules, analysis);
   registerProjectMcp(
     app,
     projectService,
@@ -165,6 +198,7 @@ export function createApp(options: CreateAppOptions = {}) {
     plans,
     experiments,
     discovery,
+    schedules,
   );
 
   app.setErrorHandler(async (error, request, reply) => {
