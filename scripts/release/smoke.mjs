@@ -1,6 +1,6 @@
 /* global process, console, fetch, setTimeout */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import assert from 'node:assert/strict';
@@ -8,6 +8,14 @@ import { once } from 'node:events';
 const installation = resolve(process.argv[2] ?? 'release/paperloop');
 const root = mkdtempSync(join(tmpdir(), 'paperloop-release-smoke-'));
 const data = join(root, 'data');
+for (const match of readFileSync(
+  join(installation, 'README.md'),
+  'utf8',
+).matchAll(/\]\(([^)]+\.md)\)/g))
+  assert.ok(
+    existsSync(join(installation, match[1])),
+    `Missing bundled documentation: ${match[1]}`,
+  );
 const env = {
   ...process.env,
   PAPERLOOP_DATA_DIR: data,

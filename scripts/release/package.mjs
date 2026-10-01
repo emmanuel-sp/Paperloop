@@ -25,7 +25,13 @@ cpSync(
   join(root, 'packages/contracts/package.json'),
   join(output, 'contracts/package.json'),
 );
-cpSync(join(root, 'docs/INSTALL.md'), join(output, 'README.md'));
+writeFileSync(
+  join(output, 'README.md'),
+  readFileSync(join(root, 'docs/INSTALL.md'), 'utf8').replace(
+    /\]\((agent-connections|EXPERIMENT_LOOP|SCHEDULING)\.md\)/g,
+    '](docs/$1.md)',
+  ),
+);
 const serverPackage = JSON.parse(
   readFileSync(join(root, 'apps/server/package.json'), 'utf8'),
 );
