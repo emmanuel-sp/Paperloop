@@ -1,3 +1,4 @@
+import { AutoTextarea } from '../components/AutoTextarea';
 import { useState } from 'react';
 import {
   automationStatusSchema,
@@ -68,7 +69,9 @@ export function AutomationRuleForm({
       )}
       <label>
         Approved goals (one per line)
-        <textarea
+        <AutoTextarea
+          name="goals"
+          autoComplete="off"
           required
           value={goals}
           onChange={(e) => setGoals(e.target.value)}
@@ -76,7 +79,9 @@ export function AutomationRuleForm({
       </label>
       <label>
         Change categories (one per line)
-        <textarea
+        <AutoTextarea
+          name="categories"
+          autoComplete="off"
           required
           value={categories}
           onChange={(e) => setCategories(e.target.value)}
@@ -85,6 +90,8 @@ export function AutomationRuleForm({
       <label>
         Approved evaluation plan
         <select
+          name="planId"
+          autoComplete="off"
           required
           value={planId}
           onChange={(e) => setPlanId(e.target.value)}
@@ -102,6 +109,8 @@ export function AutomationRuleForm({
       <label>
         Total experiments
         <input
+          name="maxExperiments"
+          autoComplete="off"
           type="number"
           min={1}
           max={100}
@@ -112,6 +121,8 @@ export function AutomationRuleForm({
       <label>
         Evaluation runs per experiment
         <input
+          name="maxRuns"
+          autoComplete="off"
           type="number"
           min={1}
           max={100}
@@ -121,6 +132,8 @@ export function AutomationRuleForm({
       </label>
       <label className="checkbox-label">
         <input
+          name="automationEnabled"
+          autoComplete="off"
           type="checkbox"
           checked={automationEnabled}
           onChange={(e) => setAutomationEnabled(e.target.checked)}

@@ -1,4 +1,6 @@
-import { useState, useRef, type FormEvent } from 'react';
+import { AutoTextarea } from '../components/AutoTextarea';
+import { useState, type FormEvent } from 'react';
+import { Dialog } from '../components/Dialog';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   evaluationPlanDraftSchema,
@@ -40,7 +42,7 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
   >([]);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
-  const createPanel = useRef<HTMLDetailsElement>(null);
+  const [creating, setCreating] = useState(false);
   const mutation = useMutation({
     mutationFn: async (operation: { path: string; body: unknown }) =>
       request(operation.path, {
@@ -55,8 +57,7 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
           ? 'Plan approved. You can use it in an experiment.'
           : 'Plan saved. Review and approve this version below.',
       );
-      if (!operation.path.endsWith('/approve') && createPanel.current)
-        createPanel.current.open = false;
+      if (!operation.path.endsWith('/approve')) setCreating(false);
     },
   });
   function submit(event: FormEvent) {
@@ -106,8 +107,23 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
   }
   return (
     <div className="research-stack">
-      <details ref={createPanel} className="detail-panel create-panel">
-        <summary>Create an evaluation plan</summary>
+      <div className="form-actions">
+        <button
+          className="button"
+          type="button"
+          onClick={() => setCreating(true)}
+        >
+          Create an evaluation plan
+        </button>
+      </div>
+      <Dialog
+        open={creating}
+        title="Create an evaluation plan"
+        description="Define how a change will be measured. Review each version before approving execution."
+        wide
+        busy={mutation.isPending}
+        onClose={() => setCreating(false)}
+      >
         <p className="muted">
           Choose a metric, dataset, and command. Each version needs your
           approval before it can run.
@@ -116,6 +132,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
           <label>
             Name
             <input
+              name="name"
+              autoComplete="off"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -124,6 +142,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
           <label>
             Dataset identity
             <input
+              name="dataset"
+              autoComplete="off"
               required
               value={dataset}
               onChange={(e) => setDataset(e.target.value)}
@@ -131,7 +151,9 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
           </label>
           <label>
             Evaluation cases — one per line
-            <textarea
+            <AutoTextarea
+              name="cases"
+              autoComplete="off"
               required
               value={cases}
               onChange={(e) => setCases(e.target.value)}
@@ -141,6 +163,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
             <label>
               Metric
               <input
+                name="metric"
+                autoComplete="off"
                 required
                 value={metric}
                 onChange={(e) => setMetric(e.target.value)}
@@ -149,6 +173,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
             <label>
               Unit
               <input
+                name="unit"
+                autoComplete="off"
                 required
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
@@ -158,6 +184,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
           <label>
             Desired direction
             <select
+              name="direction"
+              autoComplete="off"
               value={direction}
               onChange={(e) => setDirection(e.target.value as typeof direction)}
             >
@@ -169,6 +197,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
             <label>
               Minimum improvement
               <input
+                name="improvement"
+                autoComplete="off"
                 type="number"
                 min="0"
                 step="any"
@@ -179,6 +209,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
             <label>
               Maximum regression
               <input
+                name="regression"
+                autoComplete="off"
                 type="number"
                 min="0"
                 step="any"
@@ -199,6 +231,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
                   <label>
                     Metric name
                     <input
+                      name="metric-name"
+                      autoComplete="off"
                       required
                       value={item.name}
                       onChange={(e) =>
@@ -215,6 +249,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
                   <label>
                     Unit
                     <input
+                      name="unit"
+                      autoComplete="off"
                       required
                       value={item.unit}
                       onChange={(e) =>
@@ -233,6 +269,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
                   <label>
                     Direction
                     <select
+                      name="direction"
+                      autoComplete="off"
                       value={item.direction}
                       onChange={(e) =>
                         setGuardrails(
@@ -255,6 +293,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
                   <label>
                     Maximum regression
                     <input
+                      name="maximum-regression"
+                      autoComplete="off"
                       required
                       type="number"
                       min="0"
@@ -307,6 +347,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
           <label>
             Executable
             <input
+              name="executable"
+              autoComplete="off"
               required
               value={executable}
               onChange={(e) => setExecutable(e.target.value)}
@@ -314,11 +356,18 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
           </label>
           <label>
             Arguments — one per line
-            <textarea value={args} onChange={(e) => setArgs(e.target.value)} />
+            <AutoTextarea
+              name="args"
+              autoComplete="off"
+              value={args}
+              onChange={(e) => setArgs(e.target.value)}
+            />
           </label>
           <label>
             Result file in workspace
             <input
+              name="resultPath"
+              autoComplete="off"
               required
               value={resultPath}
               onChange={(e) => setResultPath(e.target.value)}
@@ -327,6 +376,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
           <label>
             Environment identity
             <input
+              name="environment"
+              autoComplete="off"
               required
               value={environment}
               onChange={(e) => setEnvironment(e.target.value)}
@@ -341,7 +392,7 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
             Save new plan version
           </button>
         </form>
-      </details>
+      </Dialog>
       {feedback ? (
         <p role="status" className="workflow-notice">
           {feedback}

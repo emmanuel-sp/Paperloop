@@ -133,15 +133,38 @@ Pausing automation prevents new automatic dispatches and makes later callbacks n
 
 ## 8. UI and daily workflow
 
-Build a persistent project workbench with project navigation, tabs, and a detail pane. Preserve the user's place when switching between research, evaluation plans, and experiments.
+The primary journey is **connect a project → discover relevant research → start a contextual experiment → inspect evidence**. Research leads the experience; suggested Evaluation supports a decision inside Experiments, and importing a supplied paper is a tertiary action inside Research. Start experiments from a recommendation, paper detail, or another relevant project action. The Experiments tab is the viewing workspace for progress, evidence, and the next decision.
 
-The main areas are:
+Keep exactly five project destinations:
 
-- **Overview:** project objectives, context freshness, new recommendations, pending approvals, waiting work, and recent outcomes.
-- **Research:** searchable recommendations, applicability explanations, sources, saved items, dismissals, and direct paper submission.
-- **Evaluations:** approved and proposed criteria, test cases, harness configuration, baselines, and run history.
-- **Experiments:** the implementation brief, agent progress, code references, logs, and result comparisons.
-- **Sources and schedules:** collection selection, monitoring settings, automation rules, and run status.
+| Destination | Purpose and hierarchy |
+| --- | --- |
+| Overview | Concise project context, current progress, and the next useful action. Corrections and provenance are secondary. |
+| Research | Relevant findings, applicability, saved research, and recommendation decisions. Compact source controls and paper import belong here. |
+| Experiments | Pending, active, interrupted, and completed work, focused details and comparisons. Suggested Evaluation and exact-version approval are secondary within this workspace. |
+| Schedules | Intent, timing, truthful setup status, observed check-ins, and focused create/edit dialogs. Inherit shared timezone and executor preferences. |
+| Settings | Shared preferences and an Agent & API area for local connections, provider availability, explicit spending activation, and automation bounds. |
+
+Remove standalone Sources, Library, Evaluation plans, and Agent & API destinations. Preserve existing deep links: Sources opens Research source controls; Library opens saved Research; Evaluation plans opens Evaluation within Experiments; Agent & API opens Settings. Preserve document, experiment, and filter identifiers when moving a link. Internal compatibility names do not create additional top-level navigation.
+
+### Inference, confirmation, and availability
+
+Ask for essential project identity and repository selection. Infer a concise context summary, objectives, constraints, research direction, available test suites, and Evaluation suggestions from repository metadata, files, and existing project context. Show origin, captured revision, and uncertainty when useful. Let users correct inferred context without repeating a large setup form. Ask a follow-up only when missing information materially blocks the next operation. Broad paper import should infer metadata from a URL, arXiv identifier, DOI, citation, text, or supported file and ask only for unresolved required information.
+
+| Information or action | Required behavior |
+| --- | --- |
+| Project question, paper metadata, relevant sources, Evaluation suggestions | Editable suggestions with provenance; never present inference as measured evidence. |
+| Repository access | User-selected local directory or authorized local GitHub connection. Private access uses local credentials; no Paperloop accounts. |
+| Local execution checkout | Request only when an experiment needs it. A GitHub research connection alone cannot run code. |
+| Evaluation execution | Explicit approval of the exact configuration version, executable/argument array, inputs, and fingerprints. Changed commands or inputs need renewed approval. |
+| Paid analysis or scheduling | Explicit activation, selected provider/model, and bounded spending. A configured key never enables paid work by itself. |
+| Automated experimentation | User-approved objectives/categories, Evaluation prerequisites, run limits, and one active implementation by default. Never auto-merge. |
+
+Without a model API key, repository metadata, local context, public-source discovery, ingestion, saved research, existing recommendations, approved local evaluations, and recorded comparisons remain usable. Agent reasoning can provide analysis and drafts; otherwise collected material stays visible with analysis waiting. Do not fabricate recommendations, inferred context, measurements, or connection success. Show actionable unavailable-repository, source failure, missing-key, and waiting-for-agent states. No automatic paid fallback follows a missed agent check-in.
+
+The interaction foundation uses a dark research workspace with a prominent mission composer, content-sized text editors, contextual paper-to-experiment actions, and focused creation/configuration dialogs. Primary creation forms do not use click-to-expand panels. Waiting for an agent, observed work, and measured outcomes must remain visibly distinct.
+
+Reduce exposed options across sections: inherit shared preferences, lead with one focused action, and put advanced overrides, provenance, raw artifacts, and command configuration in optional details or deliberate dialogs. Each section needs its own typography, layout, copy, and populated/empty/loading/error states; a global stylesheet alone is insufficient.
 
 The comparison view is a central product feature. Show baseline versus candidate, metric changes, failed guardrails, provenance, and uncertainty together. Users should be able to understand both what changed and whether the evidence supports adopting it.
 
@@ -152,10 +175,10 @@ Make queued work visibly different from running work, particularly when it is wa
 The first version is functionally complete when a user can:
 
 1. Start Paperloop locally and manage multiple projects without registering or logging in.
-2. Create a description-only project, choose source collections, and receive relevant historical and recent research.
+2. Connect a project with minimal essential input, review inferred context, and discover relevant historical and recent research; description-only projects remain supported.
 3. Enrich project context through either a local directory/agent or an optional GitHub connection.
 4. Approve suggested evaluations or bring existing ones, then establish a baseline using the local harness.
-5. Submit a paper directly through the UI or MCP and obtain an actionable implementation experiment.
+5. Start a contextual experiment from relevant research, with direct paper import available as a secondary route through the UI or MCP.
 6. Have a coding agent implement the change and use the harness to evaluate and compare it with the baseline.
 7. Inspect the resulting evidence and distinguish improvement, regression, no meaningful change, and inconclusive results.
 8. Set up native-agent research scheduling, distinguish pending setup from observed runs, and enable rule-based automatic experiment queuing within configured limits.

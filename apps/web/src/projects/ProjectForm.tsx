@@ -1,3 +1,4 @@
+import { AutoTextarea } from '../components/AutoTextarea';
 import { useState, type FormEvent } from 'react';
 import type { CreateProjectRequest } from '@paperloop/contracts';
 
@@ -49,8 +50,7 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
     <section className="form-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Project setup</p>
-          <h1>Create a project</h1>
+          <h1>What are you building?</h1>
           <p>
             Capture the problem first. Repository access can be added now or
             later.
@@ -61,6 +61,7 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
         <label>
           Project name
           <input
+            autoComplete="off"
             name="name"
             required
             maxLength={120}
@@ -69,17 +70,20 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
         </label>
         <label>
           What does this project do?
-          <textarea
+          <AutoTextarea
+            autoComplete="off"
             name="description"
+            className="project-description"
             required
-            rows={5}
+            rows={3}
             placeholder="Describe the product, its users, and the problem you want to improve."
           />
         </label>
         <div className="form-columns">
           <label>
             Objectives <span>One per line</span>
-            <textarea
+            <AutoTextarea
+              autoComplete="off"
               name="objectives"
               rows={4}
               placeholder="Improve answer grounding"
@@ -87,7 +91,8 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
           </label>
           <label>
             Constraints <span>One per line</span>
-            <textarea
+            <AutoTextarea
+              autoComplete="off"
               name="constraints"
               rows={4}
               placeholder="Keep p95 latency below 500ms"
@@ -100,6 +105,7 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
             {(['none', 'local', 'github'] as const).map((kind) => (
               <label key={kind}>
                 <input
+                  autoComplete="off"
                   checked={repositoryKind === kind}
                   name="repositoryKind"
                   onChange={() => setRepositoryKind(kind)}
@@ -120,6 +126,7 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
             <label>
               Absolute directory path
               <input
+                autoComplete="off"
                 name="localPath"
                 required
                 placeholder="/home/me/projects/my-app"
@@ -130,11 +137,21 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
             <div className="form-columns">
               <label>
                 GitHub owner
-                <input name="githubOwner" required placeholder="openai" />
+                <input
+                  autoComplete="off"
+                  name="githubOwner"
+                  required
+                  placeholder="openai"
+                />
               </label>
               <label>
                 Repository
-                <input name="githubRepository" required placeholder="example" />
+                <input
+                  autoComplete="off"
+                  name="githubRepository"
+                  required
+                  placeholder="example"
+                />
               </label>
             </div>
           ) : null}

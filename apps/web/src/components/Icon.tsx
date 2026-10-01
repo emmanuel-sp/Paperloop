@@ -7,6 +7,9 @@ const paths: Record<string, string> = {
   sources: 'M4 4h16v5H4z M4 15h16v5H4z M8 9v6 M16 9v6',
   settings: 'M4 7h16 M4 17h16 M9 4v6 M15 14v6',
   plus: 'M12 5v14 M5 12h14',
+  arrow: 'M5 12h14 M13 6l6 6-6 6',
+  loop: 'M16 4a8 8 0 1 0 4 10 M16 4h5v5 M8 20a8 8 0 1 0-4-10 M8 20H3v-5',
+  agent: 'M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z',
 };
 export function Icon({ name }: { name: string }) {
   return (

@@ -1,0 +1,79 @@
+.dialog {
+  width: min(640px, calc(100% - 32px));
+  max-width: none;
+  max-height: min(88dvh, 960px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid #343430;
+  border-radius: 16px;
+  background: #0c0c0c;
+  color: var(--ink);
+  box-shadow: var(--shadow-dialog);
+  overflow: hidden;
+}
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.dialog-wide {
+  width: min(880px, calc(100% - 32px));
+}
+.dialog::backdrop {
+  background: #00000099;
+}
+.dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 32px;
+}
+.dialog-heading h2 {
+  margin: 0;
+  font-size: 30px;
+}
+.dialog-heading p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 10px 0 0;
+  max-width: 60ch;
+}
+.dialog-heading > button {
+  flex-shrink: 0;
+}
+.dialog-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding: 0 32px 32px;
+}
+.dialog-body > .detail-panel {
+  box-shadow: none;
+  padding: 0;
+}
+.dialog-body > .research-stack > .detail-panel,
+.dialog-body .overview-stack > .detail-panel {
+  background: var(--canvas);
+  box-shadow: none;
+}
+.dialog-body .state-card {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .dialog,
+  .dialog-wide {
+    width: calc(100% - 24px);
+    max-height: 92dvh;
+    border-radius: 12px;
+  }
+  .dialog-heading {
+    padding: 24px 20px;
+    gap: 12px;
+  }
+  .dialog-heading h2 {
+    font-size: 21px;
+  }
+  .dialog-body {
+    padding: 0 20px 24px;
+  }
+}

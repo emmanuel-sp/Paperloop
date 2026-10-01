@@ -1,4 +1,6 @@
+import { AutoTextarea } from '../components/AutoTextarea';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Recommendation,
@@ -18,16 +20,29 @@ export function RecommendationPanel({
   projectId: string;
   onSelect(id: string): void;
 }) {
-  const [offset, setOffset] = useState(0);
+  const [params, setParams] = useSearchParams();
+  const requestedOffset = Number(params.get('recommendationOffset') ?? 0);
+  const offset =
+    Number.isInteger(requestedOffset) &&
+    requestedOffset >= 0 &&
+    requestedOffset <= 100000
+      ? requestedOffset
+      : 0;
+  const setOffset = (next: number) =>
+    setParams((previous) => {
+      const updated = new URLSearchParams(previous);
+      updated.set('recommendationOffset', String(next));
+      return updated;
+    });
   const query = useQuery({
     queryKey: ['projects', projectId, 'recommendations', offset],
     queryFn: () => listRecommendations(projectId, offset),
   });
   return (
-    <section className="detail-panel research-stack">
+    <section className="recommendation-panel research-stack">
       <div>
-        <p className="eyebrow">Project proposals</p>
-        <h2>Recommendations</h2>
+        <p className="eyebrow">Agent proposals</p>
+        <h2>Ideas to build on.</h2>
       </div>
       {query.isPending ? (
         <p role="status">Loading recommendations…</p>
@@ -150,7 +165,12 @@ function RecommendationCard({
       </details>
       <label>
         Decision note
-        <textarea
+        <AutoTextarea
+          autoComplete="off"
+          className="decision-note"
+          name="decisionNote"
+          rows={1}
+          placeholder="Why save or dismiss this idea?"
           maxLength={2000}
           value={reason}
           onChange={(event) => setReason(event.target.value)}

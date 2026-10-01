@@ -1,3 +1,8 @@
+import { Field } from '../components/Field';
+import { AutoTextarea } from '../components/AutoTextarea';
+import { Dialog } from '../components/Dialog';
+import { Icon } from '../components/Icon';
+import { WorkflowStatus } from '../components/WorkflowStatus';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
@@ -12,6 +17,7 @@ import {
 export function DiscoveryPanel({ projectId }: { projectId: string }) {
   const [query, setQuery] = useState('');
   const [url, setUrl] = useState('');
+  const [fetchOpen, setFetchOpen] = useState(false);
   const client = useQueryClient();
   const sources = useQuery({
     queryKey: ['projects', projectId, 'sources'],
@@ -40,33 +46,69 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
     search.mutate({});
   }
   return (
-    <section className="detail-panel research-stack">
-      <div>
-        <p className="eyebrow">Discovery</p>
-        <h2>Find research</h2>
-        <p className="muted">
-          {sources.data?.sources.length ?? 0} sources selected.{' '}
-          <Link to={`/projects/${projectId}/sources`}>Manage sources</Link>
+    <section className="discovery-stage">
+      <div className="discovery-intro">
+        <h2>
+          Research,
+          <br />
+          <span>with direction.</span>
+        </h2>
+        <p>
+          Find ideas that move your project forward. Your agent can turn the
+          evidence into a change worth testing.
         </p>
       </div>
-      <form className="research-form" onSubmit={submit}>
-        <label>
-          Research question
-          <input
-            value={query}
-            maxLength={500}
-            placeholder="A topic or project objective"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-        <button
-          className="button primary"
-          disabled={search.isPending || !sources.data?.sources.length}
-          type="submit"
-        >
-          {search.isPending ? 'Searching…' : 'Search sources'}
-        </button>
-      </form>
+      <div>
+        <form className="mission-composer" onSubmit={submit}>
+          <Field label="Research question">
+            {(attributes) => (
+              <AutoTextarea
+                autoComplete="off"
+                {...attributes}
+                name="researchQuestion"
+                value={query}
+                maxLength={500}
+                rows={2}
+                placeholder="What would you like to improve?"
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            )}
+          </Field>
+          <div className="composer-footer">
+            <div className="composer-context">
+              <Icon name="sources" />
+              <Link to={`/projects/${projectId}/research?view=sources`}>
+                {sources.isPending
+                  ? 'Loading sources…'
+                  : `${sources.data?.sources.length ?? 0} research sources`}
+              </Link>
+            </div>
+            <button
+              className="button primary"
+              disabled={search.isPending || !sources.data?.sources.length}
+              type="submit"
+            >
+              {search.isPending ? 'Searching…' : 'Search sources'}
+              <Icon name="arrow" />
+            </button>
+          </div>
+        </form>
+        {!sources.isPending &&
+        !sources.isError &&
+        !sources.data?.sources.length ? (
+          <p className="composer-help">
+            Choose{' '}
+            <Link to={`/projects/${projectId}/research?view=sources`}>
+              research sources
+            </Link>{' '}
+            to start a search.
+          </p>
+        ) : null}
+        <p className="composer-help">
+          Public-source search needs no API key. Your coding agent analyzes the
+          findings; paid analysis requires separate approval.
+        </p>
+      </div>
       {sources.isError || scans.isError || search.isError ? (
         <p role="alert">
           {errorMessage(sources.error ?? scans.error ?? search.error)}
@@ -74,26 +116,32 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
       ) : null}
       {latest ? (
         <div className="scan-outcomes">
-          <p role="status">
-            {latest.documentIds.length} documents collected ·{' '}
-            {latest.analysisStatus === 'waiting_for_agent'
-              ? 'Waiting for agent analysis'
-              : 'Analysis complete'}
-          </p>
+          <div role="status" className="section-heading">
+            <h3>{latest.documentIds.length} documents collected</h3>
+            {latest.analysisStatus === 'waiting_for_agent' ? (
+              <WorkflowStatus value="waiting_for_agent" />
+            ) : (
+              <span className="workflow-status status-completed">
+                Analysis complete
+              </span>
+            )}
+          </div>
           {latest.outcomes.map((item) => (
-            <div key={item.sourceId}>
-              <strong>
-                {sources.data?.sources.find(
-                  (source) => source.id === item.sourceId,
-                )?.name ?? item.sourceId}
-              </strong>
-              <p>
-                {item.count} results · {item.status.replace('_', ' ')}
-                {item.retryAt
-                  ? ` · Retry after ${new Date(item.retryAt).toLocaleString()}`
-                  : ''}
-              </p>
-              <small className="muted">{item.error ?? item.coverage}</small>
+            <div className="scan-outcome" key={item.sourceId}>
+              <div>
+                <strong>
+                  {sources.data?.sources.find(
+                    (source) => source.id === item.sourceId,
+                  )?.name ?? item.sourceId}
+                </strong>
+                <p>
+                  {item.count} results · {item.status.replace('_', ' ')}
+                  {item.retryAt
+                    ? ` · Retry after ${new Date(item.retryAt).toLocaleString()}`
+                    : ''}
+                </p>
+                <small className="muted">{item.error ?? item.coverage}</small>
+              </div>
               {item.nextOffset !== null && item.status === 'ok' ? (
                 <button
                   className="button"
@@ -118,13 +166,54 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
           ))}
         </div>
       ) : (
-        <p className="muted">
-          Searches store material locally. An agent can assess applicability
-          when available.
-        </p>
+        <div className="research-process">
+          <div>
+            <span className="process-symbol">
+              <Icon name="research" />
+            </span>
+            <h3>Discover</h3>
+            <p>
+              Search your selected sources. Keep the material in your local
+              workspace.
+            </p>
+          </div>
+          <div>
+            <span className="process-symbol">
+              <Icon name="agent" />
+            </span>
+            <h3>Assess</h3>
+            <p>
+              Your coding agent reviews applicability, evidence, and tradeoffs.
+            </p>
+          </div>
+          <div>
+            <span className="process-symbol">
+              <Icon name="experiments" />
+            </span>
+            <h3>Test</h3>
+            <p>
+              Approve an evaluation. Compare a focused change against a
+              baseline.
+            </p>
+          </div>
+        </div>
       )}
-      <details>
-        <summary>Add an article by URL</summary>
+      <div>
+        <button
+          className="button tertiary"
+          type="button"
+          onClick={() => setFetchOpen(true)}
+        >
+          Fetch an article by URL
+        </button>
+      </div>
+      <Dialog
+        open={fetchOpen}
+        title="Fetch an article"
+        description="Extract a known paper or article into this project’s research."
+        busy={fetch.isPending}
+        onClose={() => setFetchOpen(false)}
+      >
         <form
           className="research-form"
           onSubmit={(event) => {
@@ -137,6 +226,9 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
             <input
               required
               type="url"
+              name="articleUrl"
+              autoComplete="off"
+              placeholder="https://…"
               value={url}
               onChange={(event) => setUrl(event.target.value)}
             />
@@ -156,7 +248,7 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
             </p>
           ) : null}
         </form>
-      </details>
+      </Dialog>
     </section>
   );
 }

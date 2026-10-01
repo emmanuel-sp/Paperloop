@@ -12,12 +12,6 @@ export const projectSections = [
     icon: 'research',
   },
   {
-    slug: 'evaluations',
-    label: 'Evaluation plans',
-    description: 'Define and approve how you measure improvement',
-    icon: 'evaluations',
-  },
-  {
     slug: 'experiments',
     label: 'Experiments',
     description: 'Apply an idea and compare measured results',
@@ -30,15 +24,21 @@ export const projectSections = [
     icon: 'schedules',
   },
   {
-    slug: 'sources',
-    label: 'Sources',
-    description: 'Choose where your research comes from',
-    icon: 'sources',
-  },
-  {
     slug: 'settings',
-    label: 'Agent & API',
-    description: 'Connect agents and control automated analysis',
+    label: 'Settings',
+    description: 'Connections, preferences, and automation controls',
     icon: 'settings',
   },
 ] as const;
+
+// Keep retired bookmarks usable while the five sections become their new homes.
+export const retiredProjectSections: Record<
+  string,
+  { slug: string; view: string }
+> = {
+  sources: { slug: 'research', view: 'sources' },
+  library: { slug: 'research', view: 'library' },
+  evaluations: { slug: 'experiments', view: 'evaluation' },
+  'evaluation-plans': { slug: 'experiments', view: 'evaluation' },
+  'agent-api': { slug: 'settings', view: 'agent-api' },
+};

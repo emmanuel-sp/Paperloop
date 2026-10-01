@@ -33,6 +33,8 @@ export function ScheduleEditor({
       <label>
         Cadence
         <select
+          name="cadence"
+          autoComplete="off"
           value={config.cadence}
           onChange={(e) =>
             setConfig({
@@ -48,6 +50,8 @@ export function ScheduleEditor({
       <label>
         Timezone
         <input
+          name="timezone"
+          autoComplete="off"
           required
           value={config.timezone}
           onChange={(e) => setConfig({ ...config, timezone: e.target.value })}
@@ -56,6 +60,8 @@ export function ScheduleEditor({
       <label>
         Local time
         <input
+          name="local-time"
+          autoComplete="off"
           type="time"
           required
           value={`${String(config.hour).padStart(2, '0')}:${String(config.minute).padStart(2, '0')}`}
@@ -69,6 +75,8 @@ export function ScheduleEditor({
         <label>
           Weekday
           <select
+            name="weekday"
+            autoComplete="off"
             value={config.weekday}
             onChange={(e) =>
               setConfig({ ...config, weekday: Number(e.target.value) })
@@ -93,6 +101,8 @@ export function ScheduleEditor({
       <label>
         Research query
         <input
+          name="research-query"
+          autoComplete="off"
           value={config.query}
           maxLength={500}
           onChange={(e) => setConfig({ ...config, query: e.target.value })}
@@ -101,6 +111,8 @@ export function ScheduleEditor({
       <label>
         Executor
         <select
+          name="executor"
+          autoComplete="off"
           value={config.driver}
           onChange={(e) =>
             setConfig({
@@ -117,6 +129,8 @@ export function ScheduleEditor({
         <label>
           Native mechanism
           <select
+            name="native-mechanism"
+            autoComplete="off"
             value={config.mechanism}
             onChange={(e) =>
               setConfig({
@@ -134,6 +148,8 @@ export function ScheduleEditor({
         <label>
           API provider
           <select
+            name="api-provider"
+            autoComplete="off"
             value={config.provider}
             onChange={(e) =>
               setConfig({

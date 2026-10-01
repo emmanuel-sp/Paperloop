@@ -1,3 +1,5 @@
+import { AsyncState } from '../components/AsyncState';
+import { SectionHeading } from '../components/SectionHeading';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import {
@@ -30,18 +32,20 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
   });
   if (activity.isPending)
     return (
-      <p role="status" className="muted">
-        Loading project activity…
-      </p>
+      <AsyncState
+        kind="loading"
+        title="Checking project progress"
+        description="Loading research, decisions, and recent work…"
+      />
     );
   if (activity.isError)
     return (
-      <div className="form-error" role="alert">
-        Activity could not load.{' '}
-        <button className="button" onClick={() => void activity.refetch()}>
-          Try again
-        </button>
-      </div>
+      <AsyncState
+        kind="error"
+        title="Activity could not load"
+        description={activity.error.message}
+        action={{ label: 'Try again', onClick: () => void activity.refetch() }}
+      />
     );
   const { papers, plans, experiments, schedules } = activity.data;
   const notices = [
@@ -51,7 +55,7 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
         title: `Review ${p.configuration.name}`,
         description:
           'Approve the command and inputs before an experiment can use this plan.',
-        route: 'evaluations',
+        route: 'experiments?view=evaluation',
         kind: 'approval',
       })),
     ...experiments
@@ -109,8 +113,8 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
     <>
       <div className="stat-grid">
         {[
-          ['Papers in library', papers.length, 'research?view=library'],
-          ['Evaluation plans', plans.length, 'evaluations'],
+          ['Saved research', papers.length, 'research?view=library'],
+          ['Evaluation', plans.length, 'experiments?view=evaluation'],
           ['Experiments', experiments.length, 'experiments'],
           [
             'Active schedules',
@@ -129,14 +133,17 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
         ))}
       </div>
       <section className="detail-panel">
-        <div className="section-heading">
-          <h2>Next steps</h2>
-          <span className="muted">
-            {notices.length
-              ? `${notices.length} to follow up`
-              : 'All caught up'}
-          </span>
-        </div>
+        <SectionHeading
+          title="Next steps"
+          description="Decisions and work that need your attention."
+          action={
+            <span className="muted">
+              {notices.length
+                ? `${notices.length} to follow up`
+                : 'All caught up'}
+            </span>
+          }
+        />
         {notices.length ? (
           <div className="activity-list">
             {notices.slice(0, 8).map((notice, i) => (
@@ -158,18 +165,18 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
             <h3>
               {papers.length
                 ? 'Ready for your next idea'
-                : 'Start with a paper'}
+                : 'Discover your next idea'}
             </h3>
             <p>
               {papers.length
                 ? 'Review research, approve an evaluation plan, and test a focused change.'
-                : 'Add a paper or search your selected sources to find something worth testing.'}
+                : 'Discover research relevant to your project, then choose a focused change to test.'}
             </p>
             <Link
               className="button primary"
-              to={`/projects/${projectId}/research?view=${papers.length ? 'recommendations' : 'supply'}`}
+              to={`/projects/${projectId}/research?view=${papers.length ? 'recommendations' : 'discovery'}`}
             >
-              {papers.length ? 'Review ideas' : 'Add research'}
+              {papers.length ? 'Review ideas' : 'Discover research'}
             </Link>
           </div>
         )}

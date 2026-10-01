@@ -1,3 +1,4 @@
+import { AsyncState } from '../components/AsyncState';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { SourceSelection } from '@paperloop/contracts';
@@ -18,9 +19,28 @@ export function SourceWorkspace({ projectId }: { projectId: string }) {
     queryFn: () => projectSources(projectId),
   });
   if (catalog.isPending || current.isPending)
-    return <p role="status">Loading research sources…</p>;
+    return (
+      <AsyncState
+        kind="loading"
+        title="Loading research sources"
+        description="Opening the source catalog and this project’s selections…"
+      />
+    );
   if (catalog.isError || current.isError)
-    return <p role="alert">{errorMessage(catalog.error ?? current.error)}</p>;
+    return (
+      <AsyncState
+        kind="error"
+        title="Sources could not load"
+        description={errorMessage(catalog.error ?? current.error)}
+        action={{
+          label: 'Try again',
+          onClick: () => {
+            void catalog.refetch();
+            void current.refetch();
+          },
+        }}
+      />
+    );
   return (
     <SourceEditor
       key={JSON.stringify(current.data.selection)}
@@ -94,6 +114,8 @@ function SourceEditor({
         {catalog.collections.map((item) => (
           <label key={item.id}>
             <input
+              name="collection"
+              autoComplete="off"
               type="checkbox"
               checked={selection.collectionIds.includes(item.id)}
               onChange={() => toggle('collectionIds', item.id)}
@@ -105,74 +127,86 @@ function SourceEditor({
           </label>
         ))}
       </fieldset>
-      <fieldset className="source-options">
-        <legend>Individual sources</legend>
-        {catalog.sources.map((item) => {
-          const enabled =
-            (collectionSources.has(item.id) ||
-              selection.sourceIds.includes(item.id)) &&
-            !selection.excludedSourceIds.includes(item.id);
-          return (
-            <label key={item.id}>
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={() =>
-                  setSelection((old) => ({
-                    ...old,
-                    sourceIds: enabled
-                      ? old.sourceIds.filter((id) => id !== item.id)
-                      : [
-                          ...old.sourceIds.filter((id) => id !== item.id),
-                          item.id,
-                        ],
-                    excludedSourceIds: enabled
-                      ? [
-                          ...old.excludedSourceIds.filter(
-                            (id) => id !== item.id,
-                          ),
-                          item.id,
-                        ]
-                      : old.excludedSourceIds.filter((id) => id !== item.id),
-                  }))
-                }
-              />
-              <span>
-                <strong>{item.name}</strong>
-                <small>{item.coverage}</small>
-              </span>
-            </label>
-          );
-        })}
-      </fieldset>
-      <form className="research-form" onSubmit={addFeed}>
-        <h3>Add an RSS or Atom feed</h3>
-        <label>
-          Feed name
-          <input
-            required
-            maxLength={200}
-            value={feedName}
-            onChange={(event) => setFeedName(event.target.value)}
-          />
-        </label>
-        <label>
-          Public feed URL
-          <input
-            type="url"
-            required
-            value={feedUrl}
-            onChange={(event) => setFeedUrl(event.target.value)}
-          />
-        </label>
-        <button
-          className="button"
-          disabled={selection.feeds.length >= 20}
-          type="submit"
-        >
-          Add feed to selection
-        </button>
-      </form>
+      <details>
+        <summary>Individual source overrides</summary>
+        <fieldset className="source-options">
+          <legend>Individual sources</legend>
+          {catalog.sources.map((item) => {
+            const enabled =
+              (collectionSources.has(item.id) ||
+                selection.sourceIds.includes(item.id)) &&
+              !selection.excludedSourceIds.includes(item.id);
+            return (
+              <label key={item.id}>
+                <input
+                  name="source"
+                  autoComplete="off"
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={() =>
+                    setSelection((old) => ({
+                      ...old,
+                      sourceIds: enabled
+                        ? old.sourceIds.filter((id) => id !== item.id)
+                        : [
+                            ...old.sourceIds.filter((id) => id !== item.id),
+                            item.id,
+                          ],
+                      excludedSourceIds: enabled
+                        ? [
+                            ...old.excludedSourceIds.filter(
+                              (id) => id !== item.id,
+                            ),
+                            item.id,
+                          ]
+                        : old.excludedSourceIds.filter((id) => id !== item.id),
+                    }))
+                  }
+                />
+                <span>
+                  <strong>{item.name}</strong>
+                  <small>{item.coverage}</small>
+                </span>
+              </label>
+            );
+          })}
+        </fieldset>
+      </details>
+      <details>
+        <summary>Add an RSS or Atom feed</summary>
+        <form className="research-form" onSubmit={addFeed}>
+          <h3>Add an RSS or Atom feed</h3>
+          <label>
+            Feed name
+            <input
+              name="feedName"
+              autoComplete="off"
+              required
+              maxLength={200}
+              value={feedName}
+              onChange={(event) => setFeedName(event.target.value)}
+            />
+          </label>
+          <label>
+            Public feed URL
+            <input
+              name="feedUrl"
+              autoComplete="off"
+              type="url"
+              required
+              value={feedUrl}
+              onChange={(event) => setFeedUrl(event.target.value)}
+            />
+          </label>
+          <button
+            className="button"
+            disabled={selection.feeds.length >= 20}
+            type="submit"
+          >
+            Add feed to selection
+          </button>
+        </form>
+      </details>
       {selection.feeds.map((feed) => (
         <div className="detail-title-row" key={feed.url}>
           <span>

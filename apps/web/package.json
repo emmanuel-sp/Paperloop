@@ -8,6 +8,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@fontsource-variable/instrument-sans": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@paperloop/contracts": "workspace:*",
     "@tanstack/react-query": "^5.104.0",
     "react": "^19.2.0",

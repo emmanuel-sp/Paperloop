@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react';
+import { type FormEvent } from 'react';
+import { useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   searchLibrary,
@@ -13,10 +14,22 @@ export function LibraryPanel({
   projectId: string;
   onSelect(id: string): void;
 }) {
-  const [draft, setDraft] = useState('');
-  const [query, setQuery] = useState('');
-  const [global, setGlobal] = useState(false);
-  const [offset, setOffset] = useState(0);
+  const [params, setParams] = useSearchParams();
+  const query = params.get('libraryQuery') ?? '';
+  const global = params.get('scope') === 'all';
+  const requestedOffset = Number(params.get('libraryOffset') ?? 0);
+  const offset =
+    Number.isInteger(requestedOffset) &&
+    requestedOffset >= 0 &&
+    requestedOffset <= 100000
+      ? requestedOffset
+      : 0;
+  const setOffset = (next: number) =>
+    setParams((previous) => {
+      const updated = new URLSearchParams(previous);
+      updated.set('libraryOffset', String(next));
+      return updated;
+    });
   const client = useQueryClient();
   const results = useQuery({
     queryKey: ['research-library', projectId, global, query, offset],
@@ -33,8 +46,13 @@ export function LibraryPanel({
   });
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setQuery(draft);
-    setOffset(0);
+    const data = new FormData(event.currentTarget);
+    setParams((previous) => {
+      const updated = new URLSearchParams(previous);
+      updated.set('libraryQuery', String(data.get('libraryQuery') ?? ''));
+      updated.delete('libraryOffset');
+      return updated;
+    });
   }
   return (
     <section className="detail-panel research-stack">
@@ -46,17 +64,29 @@ export function LibraryPanel({
         <label>
           Search title, authors, or extracted text
           <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            name="libraryQuery"
+            autoComplete="off"
+            key={query}
+            defaultValue={query}
+            type="search"
+            placeholder="Search your saved research…"
           />
         </label>
         <label className="checkbox-label">
           <input
+            name="searchAllProjects"
+            autoComplete="off"
             type="checkbox"
             checked={global}
             onChange={(event) => {
-              setGlobal(event.target.checked);
-              setOffset(0);
+              const all = event.target.checked;
+              setParams((previous) => {
+                const updated = new URLSearchParams(previous);
+                if (all) updated.set('scope', 'all');
+                else updated.delete('scope');
+                updated.delete('libraryOffset');
+                return updated;
+              });
             }}
           />
           Search across all projects

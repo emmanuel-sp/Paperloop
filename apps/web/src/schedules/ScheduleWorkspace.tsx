@@ -1,3 +1,6 @@
+import { Dialog } from '../components/Dialog';
+import { AsyncState } from '../components/AsyncState';
+import { SectionHeading } from '../components/SectionHeading';
 import { ScheduleEditor } from './ScheduleEditor';
 import { ApiActivationForm } from './ApiActivationForm';
 import { AutomationRuleForm } from './AutomationRuleForm';
@@ -28,25 +31,32 @@ export function ScheduleWorkspace({
   const [instructions, setInstructions] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
+  const [apiOpen, setApiOpen] = useState(false);
+  const [automationOpen, setAutomationOpen] = useState(false);
+  const [removing, setRemoving] = useState<Schedule | null>(null);
   const [editing, setEditing] = useState<Schedule | null>(null);
   const state = useQuery({
     queryKey: ['projects', projectId, 'schedules'],
+    enabled: view === 'schedules',
     queryFn: async () =>
       scheduleListSchema.parse(await request(`${base}/schedules`)),
     refetchInterval: 15000,
   });
   const providers = useQuery({
     queryKey: ['projects', projectId, 'analysis'],
+    enabled: view === 'settings',
     queryFn: async () =>
       apiActivationListSchema.parse(await request(`${base}/analysis`)),
   });
   const rules = useQuery({
     queryKey: ['projects', projectId, 'automation'],
+    enabled: view === 'settings',
     queryFn: async () =>
       automationStatusSchema.parse(await request(`${base}/automation`)),
   });
   const plans = useQuery({
     queryKey: ['projects', projectId, 'evaluations'],
+    enabled: view === 'settings',
     queryFn: async () =>
       evaluationPlanListSchema.parse(await request(`${base}/evaluations`)),
   });
@@ -69,10 +79,31 @@ export function ScheduleWorkspace({
     },
   });
   return (
-    <div className="research-stack settings-stack">
+    <div
+      className={`research-stack ${view === 'settings' ? 'settings-layout' : 'schedule-layout'}`}
+    >
+      {view === 'settings' ? (
+        <div className="settings-intro">
+          <h2>
+            Connect.
+            <br />
+            <span>On your terms.</span>
+          </h2>
+          <p>Your coding agent. Your providers. Your limits.</p>
+        </div>
+      ) : null}
+      {view === 'settings' ? (
+        <SectionHeading
+          title="Agent & API"
+          description="Choose how analysis happens. Connections and spending stay under your control."
+        />
+      ) : null}
       {view === 'settings' ? (
         <section className="detail-panel">
-          <h2>Connect a coding agent</h2>
+          <SectionHeading
+            eyebrow="Local connection"
+            title="Connect a coding agent"
+          />
           <p className="muted">
             Use your local connection secret to connect Codex or Claude Code.
             Ask the agent to analyze papers or claim an experiment; its progress
@@ -95,20 +126,42 @@ export function ScheduleWorkspace({
       ) : null}
       {view === 'schedules' ? (
         <section className="detail-panel research-stack">
-          <div className="section-heading">
-            <h2>Research schedules</h2>
-            <button
-              className="button primary"
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(!formOpen);
+          <SectionHeading
+            title="Research schedules"
+            description="Set a cadence, then check what actually ran."
+            action={
+              <button
+                className="button primary"
+                onClick={() => {
+                  setEditing(null);
+                  setFormOpen(true);
+                }}
+              >
+                New schedule
+              </button>
+            }
+          />
+          {state.isError ? (
+            <AsyncState
+              kind="error"
+              title="Schedules could not load"
+              description={message(state.error)}
+              action={{
+                label: 'Try again',
+                onClick: () => void state.refetch(),
               }}
-            >
-              {formOpen ? 'Close form' : 'New schedule'}
-            </button>
-          </div>
-          {state.isError ? <p role="alert">{message(state.error)}</p> : null}
-          {formOpen ? (
+            />
+          ) : null}
+          <Dialog
+            open={formOpen}
+            title={editing ? 'Edit schedule' : 'New schedule'}
+            description="Choose when research runs and who handles the work."
+            busy={action.isPending}
+            onClose={() => {
+              setFormOpen(false);
+              setEditing(null);
+            }}
+          >
             <ScheduleEditor
               key={editing?.id ?? 'new'}
               {...(editing ? { initial: editing.config } : {})}
@@ -136,7 +189,10 @@ export function ScheduleWorkspace({
                 )
               }
             />
-          ) : null}
+            {action.isError ? (
+              <p role="alert">{message(action.error)}</p>
+            ) : null}
+          </Dialog>
           {state.data?.schedules.length === 0 ? (
             <div className="empty-inline">
               <h3>Research at your own pace</h3>
@@ -146,20 +202,29 @@ export function ScheduleWorkspace({
               </p>
             </div>
           ) : null}
-          {state.isPending ? <p role="status">Loading schedules…</p> : null}
+          {state.isPending ? (
+            <AsyncState
+              kind="loading"
+              title="Loading schedules"
+              description="Checking cadence, setup reports, and observed check-ins…"
+            />
+          ) : null}
           {state.data?.schedules.map((schedule) => (
-            <article
-              className="recommendation-card research-stack"
-              key={schedule.id}
-            >
-              <h3>
-                {schedule.config.cadence === 'daily'
-                  ? 'Daily research'
-                  : 'Weekly research'}{' '}
-                · {String(schedule.config.hour).padStart(2, '0')}:
-                {String(schedule.config.minute).padStart(2, '0')}
-              </h3>
-              <p>
+            <article className="schedule-card research-stack" key={schedule.id}>
+              <div className="section-heading">
+                <h3>
+                  {schedule.config.cadence === 'daily'
+                    ? 'Daily research'
+                    : 'Weekly research'}{' '}
+                </h3>
+                <WorkflowStatus value={schedule.state} />
+              </div>
+              <div className="schedule-time">
+                {String(schedule.config.hour).padStart(2, '0')}:
+                {String(schedule.config.minute).padStart(2, '0')}{' '}
+                <small>{schedule.config.timezone}</small>
+              </div>
+              <p className="schedule-setup">
                 {schedule.state} ·{' '}
                 {schedule.config.driver === 'native'
                   ? schedule.setup === 'pending'
@@ -185,7 +250,7 @@ export function ScheduleWorkspace({
               {schedule.externalTaskReference ? (
                 <p>Task: {schedule.externalTaskReference}</p>
               ) : null}
-              <div className="detail-title-row">
+              <div className="schedule-actions">
                 <button
                   className="button"
                   type="button"
@@ -231,12 +296,7 @@ export function ScheduleWorkspace({
                   className="button"
                   type="button"
                   disabled={action.isPending || schedule.state === 'removed'}
-                  onClick={() =>
-                    action.mutate({
-                      path: `/api/v1/schedules/${schedule.id}/state`,
-                      body: { state: 'removed' },
-                    })
-                  }
+                  onClick={() => setRemoving(schedule)}
                 >
                   Remove
                 </button>
@@ -283,34 +343,87 @@ export function ScheduleWorkspace({
           ) : null}
         </section>
       ) : null}
+      {view === 'settings' &&
+      (providers.isPending || rules.isPending || plans.isPending) ? (
+        <AsyncState
+          kind="loading"
+          title="Loading execution settings"
+          description="Checking saved activation and automation rules…"
+        />
+      ) : null}
       {view === 'settings' && providers.data ? (
         <section className="detail-panel">
-          <h2>API analysis</h2>
-          <p className="muted">
-            Enable a provider only when you want paid research analysis. Model
-            keys stay in the server environment.
-          </p>
-          <ApiActivationForm
-            key={JSON.stringify(providers.data)}
-            activations={providers.data.activations}
-            pending={action.isPending}
-            onSave={(input) =>
-              action.mutate({ path: `${base}/analysis/approve`, body: input })
-            }
+          <SectionHeading
+            eyebrow="Optional paid execution"
+            title="API analysis"
+            description="A saved key never activates paid work. Model keys stay in the server environment."
           />
+          {providers.data.activations.some((item) => item.enabled) ? null : (
+            <p className="workflow-notice">
+              Paid analysis is disabled. Public-source search and local evidence
+              remain available; reasoning can wait for your coding agent.
+            </p>
+          )}
+          <button
+            className="button"
+            type="button"
+            onClick={() => setApiOpen(true)}
+          >
+            Configure API analysis
+          </button>
+          <Dialog
+            open={apiOpen}
+            title="API analysis"
+            description="Enable provider access deliberately. Credentials stay in the server environment."
+            busy={action.isPending}
+            onClose={() => setApiOpen(false)}
+          >
+            <ApiActivationForm
+              key={JSON.stringify(providers.data)}
+              activations={providers.data.activations}
+              pending={action.isPending}
+              onSave={(input) =>
+                action.mutate({ path: `${base}/analysis/approve`, body: input })
+              }
+            />
+            {action.isError ? (
+              <p role="alert">{message(action.error)}</p>
+            ) : null}
+          </Dialog>
         </section>
       ) : null}
       {view === 'settings' && rules.data && plans.data ? (
-        <section className="detail-panel">
-          <h2>Automation rules</h2>
-          <AutomationRuleForm
-            key={JSON.stringify(rules.data.rule)}
-            base={base}
-            status={rules.data}
-            plans={plans.data.plans}
-            pending={action.isPending}
-            onAction={(value) => action.mutate(value)}
+        <section className="detail-panel automation-settings">
+          <SectionHeading
+            title="Automation bounds"
+            description="Review the limits before authorizing work to enter the queue."
           />
+          <button
+            className="button"
+            type="button"
+            onClick={() => setAutomationOpen(true)}
+          >
+            Review automation rules
+          </button>
+          <Dialog
+            open={automationOpen}
+            title="Automation rules"
+            description="Choose what can run and the limits it must respect."
+            busy={action.isPending}
+            onClose={() => setAutomationOpen(false)}
+          >
+            <AutomationRuleForm
+              key={JSON.stringify(rules.data.rule)}
+              base={base}
+              status={rules.data}
+              plans={plans.data.plans}
+              pending={action.isPending}
+              onAction={(value) => action.mutate(value)}
+            />
+            {action.isError ? (
+              <p role="alert">{message(action.error)}</p>
+            ) : null}
+          </Dialog>
         </section>
       ) : null}
       {view === 'settings'
@@ -341,14 +454,18 @@ export function ScheduleWorkspace({
             </article>
           ))
         : null}
-      {providers.isError || rules.isError || plans.isError ? (
+      {view === 'settings' &&
+      (providers.isError || rules.isError || plans.isError) ? (
         <p role="alert">
           {message(providers.error ?? rules.error ?? plans.error)}
         </p>
       ) : null}
       {view === 'schedules' ? (
         <section className="detail-panel research-stack">
-          <h2>Recent work</h2>
+          <SectionHeading
+            title="Recent work"
+            description="Observed scans and agent activity, separate from intended timing."
+          />
           {state.data?.jobs.length === 0 ? (
             <p className="muted">
               Completed scans and agent activity will appear here.
@@ -379,7 +496,43 @@ export function ScheduleWorkspace({
           ))}
         </section>
       ) : null}
-      {action.isError ? <p role="alert">{message(action.error)}</p> : null}
+      {action.isError && !formOpen && !apiOpen && !automationOpen ? (
+        <p role="alert">{message(action.error)}</p>
+      ) : null}
+      <Dialog
+        open={Boolean(removing)}
+        title="Remove schedule"
+        description="Future scans will stop. Existing research and recorded work stay in the project."
+        busy={action.isPending}
+        onClose={() => setRemoving(null)}
+      >
+        <div className="form-actions">
+          <button
+            className="button"
+            type="button"
+            onClick={() => setRemoving(null)}
+          >
+            Keep schedule
+          </button>
+          <button
+            className="button primary"
+            type="button"
+            disabled={action.isPending}
+            onClick={() =>
+              action.mutate(
+                {
+                  path: `/api/v1/schedules/${removing?.id}/state`,
+                  body: { state: 'removed' },
+                },
+                { onSuccess: () => setRemoving(null) },
+              )
+            }
+          >
+            Remove schedule
+          </button>
+        </div>
+        {action.isError ? <p role="alert">{message(action.error)}</p> : null}
+      </Dialog>
     </div>
   );
 }
@@ -403,6 +556,8 @@ function Reconcile({
     >
       <label htmlFor={`evidence-${jobId}`}>Reconciliation evidence</label>
       <input
+        name="evidence"
+        autoComplete="off"
         id={`evidence-${jobId}`}
         required
         maxLength={2000}

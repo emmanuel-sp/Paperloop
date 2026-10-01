@@ -1,7 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CreateProjectRequest, Project } from '@paperloop/contracts';
-import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router';
+import {
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+  useParams,
+  useLocation,
+} from 'react-router';
 import {
   ApiError,
   connectLocalSession,
@@ -12,7 +19,10 @@ import {
 import { AppShell } from '../components/AppShell';
 import { AsyncState } from '../components/AsyncState';
 import { ProjectForm } from '../projects/ProjectForm';
-import { projectSections } from '../projects/navigation';
+import {
+  projectSections,
+  retiredProjectSections,
+} from '../projects/navigation';
 import { ProjectWorkspace } from '../projects/ProjectWorkspace';
 
 const projectQueryKey = ['projects'] as const;
@@ -29,6 +39,7 @@ export function App() {
     return (
       <AppShell projects={[]}>
         <AsyncState
+          kind="loading"
           title="Opening your workspace"
           description="Connecting to the local Paperloop service…"
         />
@@ -47,6 +58,7 @@ export function App() {
     return (
       <AppShell projects={[]}>
         <AsyncState
+          kind="error"
           eyebrow="Connection problem"
           title="The local service is unavailable"
           description={messageFromError(projectsQuery.error)}
@@ -133,6 +145,7 @@ function NewProjectPage({ projects }: { projects: Project[] }) {
 
 function ProjectPage({ projects }: { projects: Project[] }) {
   const { projectId, tab = 'overview' } = useParams();
+  const location = useLocation();
   const projectQuery = useQuery({
     queryKey: ['projects', projectId],
     queryFn: () => getProject(projectId ?? ''),
@@ -143,6 +156,7 @@ function ProjectPage({ projects }: { projects: Project[] }) {
     return (
       <AppShell projects={projects} activeProjectId={projectId} activeTab={tab}>
         <AsyncState
+          kind="loading"
           title="Loading project"
           description="Retrieving the latest project context…"
         />
@@ -154,6 +168,7 @@ function ProjectPage({ projects }: { projects: Project[] }) {
     return (
       <AppShell projects={projects} activeProjectId={projectId} activeTab={tab}>
         <AsyncState
+          kind="error"
           eyebrow="Project unavailable"
           title="We could not open this project"
           description={messageFromError(projectQuery.error)}
@@ -163,6 +178,18 @@ function ProjectPage({ projects }: { projects: Project[] }) {
           }}
         />
       </AppShell>
+    );
+  }
+
+  const retired = retiredProjectSections[tab];
+  if (retired) {
+    const params = new URLSearchParams(location.search);
+    params.set('view', retired.view);
+    return (
+      <Navigate
+        replace
+        to={`/projects/${projectId}/${retired.slug}?${params}${location.hash}`}
+      />
     );
   }
 
@@ -210,7 +237,7 @@ function ConnectionScreen() {
             Connection secret
             <input
               autoComplete="off"
-              autoFocus
+              name="connectionSecret"
               onChange={(event) => setSecret(event.target.value)}
               required
               type="password"

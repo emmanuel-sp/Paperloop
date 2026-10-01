@@ -1,3 +1,4 @@
+import { AutoTextarea } from '../components/AutoTextarea';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
@@ -10,25 +11,44 @@ import {
   getResearchContent,
   listResearchDocuments,
 } from '../api/client';
+import { Dialog } from '../components/Dialog';
+import { Field } from '../components/Field';
+import { SourceWorkspace } from './SourceWorkspace';
 import { DiscoveryPanel } from './DiscoveryPanel';
 import { LibraryPanel } from './LibraryPanel';
 import { RecommendationPanel } from './RecommendationPanel';
 import { getDocument, extractDocument, errorMessage } from './discovery-client';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { WorkflowStatus } from '../components/WorkflowStatus';
 import { AsyncState } from '../components/AsyncState';
 
 export function ResearchWorkspace({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
-  const views = ['discovery', 'recommendations', 'library', 'supply'] as const;
+  const views = ['discovery', 'recommendations', 'library'] as const;
   const rawView = params.get('view');
-  const view = views.find((item) => item === rawView) ?? 'library';
+  const view = views.find((item) => item === rawView) ?? 'discovery';
+  const [returnView, setReturnView] = useState(view);
+  const openSecondary = (next: 'sources' | 'supply') => {
+    setReturnView(view);
+    setParams((previous) => {
+      const updated = new URLSearchParams(previous);
+      updated.set('view', next);
+      return updated;
+    });
+  };
+  const closeSecondary = () =>
+    setParams((previous) => {
+      const updated = new URLSearchParams(previous);
+      updated.set('view', returnView);
+      return updated;
+    });
   const selectedId = params.get('paper') ?? undefined;
   const setSelectedId = (id: string) =>
     setParams((previous) => {
-      previous.set('paper', id);
-      return previous;
+      const updated = new URLSearchParams(previous);
+      updated.set('paper', id);
+      return updated;
     });
   const queryKey = ['projects', projectId, 'research'] as const;
   const query = useQuery({
@@ -39,7 +59,12 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
     mutationFn: (input: IngestResearchDocumentRequest) =>
       ingestResearchDocument(projectId, input),
     onSuccess: async (document) => {
-      setSelectedId(document.id);
+      setParams((previous) => {
+        const updated = new URLSearchParams(previous);
+        updated.set('paper', document.id);
+        updated.set('view', 'library');
+        return updated;
+      });
       await queryClient.invalidateQueries({ queryKey });
     },
   });
@@ -56,6 +81,7 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
   if (query.isPending) {
     return (
       <AsyncState
+        kind="loading"
         title="Opening the research workspace"
         description="Loading supplied papers and implementation briefs…"
       />
@@ -64,6 +90,7 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
   if (query.isError) {
     return (
       <AsyncState
+        kind="error"
         eyebrow="Research unavailable"
         title="We could not load this project’s research"
         description={messageFromError(query.error)}
@@ -74,35 +101,55 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <div className="research-stack">
-      <nav className="research-view-nav" aria-label="Research views">
-        {views.map((value) => (
-          <button
-            className="button"
-            aria-pressed={view === value}
-            type="button"
-            key={value}
-            onClick={() =>
-              setParams((previous) => {
-                previous.set('view', value);
-                return previous;
-              })
-            }
-          >
-            {
+      <div className="research-toolbar">
+        <nav className="research-view-nav" aria-label="Research views">
+          {views.map((value) => (
+            <button
+              className="button"
+              aria-pressed={view === value}
+              type="button"
+              key={value}
+              onClick={() =>
+                setParams((previous) => {
+                  const updated = new URLSearchParams(previous);
+                  updated.set('view', value);
+                  return updated;
+                })
+              }
+            >
               {
-                discovery: 'Discover',
-                recommendations: 'Recommendations',
-                library: 'Library',
-                supply: 'Add a paper',
-              }[value]
-            }
+                {
+                  discovery: 'Discover',
+                  recommendations: 'Recommendations',
+                  library: 'Saved research',
+                }[value]
+              }
+            </button>
+          ))}
+        </nav>
+        <div className="form-actions">
+          <button
+            type="button"
+            className="button tertiary"
+            onClick={() => openSecondary('sources')}
+          >
+            Sources
           </button>
-        ))}
-      </nav>
+          <button
+            type="button"
+            className="button tertiary"
+            onClick={() => openSecondary('supply')}
+          >
+            Import paper
+          </button>
+        </div>
+      </div>
       {selectedQuery.isError ? (
         <p role="alert">{errorMessage(selectedQuery.error)}</p>
       ) : null}
-      <div className="research-layout">
+      <div
+        className={`research-layout ${selectedId ? '' : 'research-unselected'}`}
+      >
         <div className="research-stack">
           {view === 'discovery' ? (
             <DiscoveryPanel projectId={projectId} />
@@ -116,22 +163,38 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
           {view === 'library' ? (
             <LibraryPanel projectId={projectId} onSelect={setSelectedId} />
           ) : null}
-          {view === 'supply' ? (
-            <PaperForm
-              error={
-                mutation.isError ? messageFromError(mutation.error) : undefined
-              }
-              isPending={mutation.isPending}
-              onSubmit={(input) => mutation.mutate(input)}
-            />
-          ) : null}
         </div>
-        <PaperDetail
-          key={selected?.id ?? 'empty'}
-          projectId={projectId}
-          document={selected}
-        />
+        {selectedId ? (
+          <PaperDetail
+            key={selected?.id ?? 'empty'}
+            projectId={projectId}
+            document={selected}
+          />
+        ) : null}
       </div>
+      <Dialog
+        open={rawView === 'sources'}
+        title="Research sources"
+        description="Choose where this project discovers research."
+        onClose={closeSecondary}
+      >
+        <SourceWorkspace projectId={projectId} />
+      </Dialog>
+      <Dialog
+        open={rawView === 'supply'}
+        title="Import paper"
+        description="Bring a known paper into this project’s research."
+        busy={mutation.isPending}
+        onClose={closeSecondary}
+      >
+        <PaperForm
+          error={
+            mutation.isError ? messageFromError(mutation.error) : undefined
+          }
+          isPending={mutation.isPending}
+          onSubmit={(input) => mutation.mutate(input)}
+        />
+      </Dialog>
     </div>
   );
 }
@@ -168,18 +231,27 @@ function PaperForm({
       <p className="eyebrow">Add research</p>
       <h2>Add a paper</h2>
       <form className="research-form" onSubmit={submit}>
-        <label>
-          Title
-          <input
-            onChange={(event) => setTitle(event.target.value)}
-            required
-            value={title}
-          />
-        </label>
+        <Field
+          label="Title"
+          hint="Use the paper’s title so you can recognize it later."
+        >
+          {(attributes) => (
+            <input
+              name="title"
+              autoComplete="off"
+              {...attributes}
+              onChange={(event) => setTitle(event.target.value)}
+              required
+              value={title}
+            />
+          )}
+        </Field>
         <div className="form-columns">
           <label>
             Reference type
             <select
+              name="sourceKind"
+              autoComplete="off"
               onChange={(event) =>
                 setSourceKind(event.target.value as ResearchSourceKind)
               }
@@ -194,6 +266,8 @@ function PaperForm({
         <label>
           URL or reference
           <input
+            name="sourceReference"
+            autoComplete="off"
             onChange={(event) => setSourceReference(event.target.value)}
             required
             value={sourceReference}
@@ -203,7 +277,9 @@ function PaperForm({
           <summary>Add text manually (optional)</summary>
           <label>
             Paper text
-            <textarea
+            <AutoTextarea
+              name="extractedContent"
+              autoComplete="off"
               onChange={(event) => setExtractedContent(event.target.value)}
               placeholder="Paste the paper text if it cannot be fetched from the source."
               rows={5}
@@ -247,10 +323,11 @@ function PaperDetail({
     return (
       <section className="detail-panel research-detail empty-detail">
         <p className="eyebrow">Paper detail</p>
-        <h2>Select a paper to read</h2>
+        <h2>Find a change worth testing</h2>
         <p className="muted">
-          Add a paper to preserve its provenance and prepare an implementation
-          brief.
+          Discover relevant research, inspect its evidence, and review
+          applicability with your coding agent. Select a saved paper to read its
+          details.
         </p>
       </section>
     );
@@ -268,6 +345,15 @@ function PaperDetail({
       <p className="muted">
         {document.authors.join(', ') || 'Authors not recorded'}
       </p>
+      <div className="paper-action">
+        <p>Turn this research into a measured change.</p>
+        <Link
+          className="button primary"
+          to={`/projects/${projectId}/experiments?view=prepare&paper=${document.id}`}
+        >
+          Start experiment
+        </Link>
+      </div>
       <details>
         <summary>Source & provenance</summary>
         <dl className="provenance-list compact">

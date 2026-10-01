@@ -1,11 +1,13 @@
 import { ScheduleWorkspace } from '../schedules/ScheduleWorkspace';
 import type { Project } from '@paperloop/contracts';
-import { Link } from 'react-router';
-import { SourceWorkspace } from '../research/SourceWorkspace';
+import { Link, useSearchParams } from 'react-router';
 import { ResearchWorkspace } from '../research/ResearchWorkspace';
 import { EvaluationWorkspace } from '../evaluations/EvaluationWorkspace';
 import { ExperimentWorkspace } from '../experiments/ExperimentWorkspace';
 
+import { Dialog } from '../components/Dialog';
+import { Icon } from '../components/Icon';
+import { SectionHeading } from '../components/SectionHeading';
 import { projectSections } from './navigation';
 import { ProjectActivity } from './ProjectActivity';
 interface ProjectWorkspaceProps {
@@ -17,11 +19,14 @@ export function ProjectWorkspace({
   activeTab,
   project,
 }: ProjectWorkspaceProps) {
+  const [params, setParams] = useSearchParams();
+  const evaluationParams = new URLSearchParams(params);
+  evaluationParams.set('view', 'evaluation');
   return (
     <>
       <header className="project-header">
         <div>
-          <p className="eyebrow">{project.name}</p>
+          <p className="eyebrow">Project workbench</p>
           <h1>
             {
               projectSections.find((section) => section.slug === activeTab)
@@ -39,23 +44,104 @@ export function ProjectWorkspace({
       </header>
       {activeTab === 'overview' ? (
         <div className="research-stack">
+          <section className="overview-lead">
+            <div className="overview-lead-copy">
+              <h2>
+                Research.
+                <br />
+                <span>Build.</span>
+                <br />
+                <span>Measure.</span>
+              </h2>
+              <p>{project.description || project.currentContext.summary}</p>
+              <Link
+                className="button primary"
+                to={`/projects/${project.id}/research`}
+              >
+                Discover research <Icon name="arrow" />
+              </Link>
+            </div>
+            <div className="overview-visual">
+              <img
+                src="/images/research-loop.png"
+                width="1280"
+                height="1280"
+                alt=""
+                fetchPriority="high"
+              />
+              <p className="visual-caption">
+                Ideas become experiments. Evidence closes the loop.
+              </p>
+            </div>
+          </section>
+          <nav className="overview-loop" aria-label="Research workflow">
+            <Link to={`/projects/${project.id}/research`}>
+              <Icon name="research" />
+              <span>
+                Discover<span>Find relevant ideas</span>
+              </span>
+              <Icon name="arrow" />
+            </Link>
+            <Link to={`/projects/${project.id}/research?view=recommendations`}>
+              <Icon name="agent" />
+              <span>
+                Assess<span>Review agent proposals</span>
+              </span>
+              <Icon name="arrow" />
+            </Link>
+            <Link to={`/projects/${project.id}/experiments`}>
+              <Icon name="experiments" />
+              <span>
+                Measure<span>Inspect the evidence</span>
+              </span>
+              <Icon name="arrow" />
+            </Link>
+          </nav>
           <ProjectActivity projectId={project.id} />
           <ProjectOverview project={project} />
         </div>
       ) : activeTab === 'research' ? (
         <ResearchWorkspace key={project.id} projectId={project.id} />
-      ) : activeTab === 'sources' ? (
-        <SourceWorkspace key={project.id} projectId={project.id} />
       ) : activeTab === 'schedules' || activeTab === 'settings' ? (
         <ScheduleWorkspace
           key={`${project.id}-${activeTab}`}
           projectId={project.id}
           view={activeTab}
         />
-      ) : activeTab === 'evaluations' ? (
-        <EvaluationWorkspace key={project.id} projectId={project.id} />
       ) : activeTab === 'experiments' ? (
-        <ExperimentWorkspace key={project.id} projectId={project.id} />
+        <div className="research-stack">
+          <SectionHeading
+            title="Progress & evidence"
+            description="Inspect a focused change and decide what the results support."
+            action={
+              <Link
+                className="button tertiary"
+                to={`/projects/${project.id}/experiments?${evaluationParams}`}
+              >
+                Review Evaluation
+              </Link>
+            }
+          />
+          <ExperimentWorkspace key={project.id} projectId={project.id} />
+          <Dialog
+            open={params.get('view') === 'evaluation'}
+            title="Evaluation"
+            description="Review the exact metrics, inputs, and command before approving a version."
+            wide
+            onClose={() =>
+              setParams(
+                (previous) => {
+                  const updated = new URLSearchParams(previous);
+                  updated.delete('view');
+                  return updated;
+                },
+                { replace: true },
+              )
+            }
+          >
+            <EvaluationWorkspace key={project.id} projectId={project.id} />
+          </Dialog>
+        </div>
       ) : null}
     </>
   );
@@ -75,8 +161,11 @@ function ContextBadge({ project }: { project: Project }) {
 function ProjectOverview({ project }: { project: Project }) {
   return (
     <div className="overview-grid">
-      <section className="detail-panel overview-main">
-        <h2>Project context</h2>
+      <section className="detail-panel overview-main overview-context">
+        <SectionHeading
+          eyebrow="Working context"
+          title="What you’re building"
+        />
         <p className="context-summary">
           {project.description || project.currentContext.summary}
         </p>

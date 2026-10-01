@@ -1,3 +1,4 @@
+import { Field } from '../components/Field';
 import { useState } from 'react';
 import type { ApiActivation } from '@paperloop/contracts';
 export function ApiActivationForm({
@@ -30,6 +31,8 @@ export function ApiActivationForm({
       <label>
         Provider
         <select
+          name="provider"
+          autoComplete="off"
           value={provider}
           onChange={(event) => {
             const value = event.target.value as typeof provider;
@@ -43,17 +46,26 @@ export function ApiActivationForm({
           <option value="anthropic">Anthropic</option>
         </select>
       </label>
-      <label>
-        Model identifier
-        <input
-          required
-          maxLength={200}
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-        />
-      </label>
+      <Field
+        label="Model identifier"
+        hint="Choose a model supported by your configured provider. This field contains no credentials."
+      >
+        {(attributes) => (
+          <input
+            name="model"
+            autoComplete="off"
+            {...attributes}
+            required
+            maxLength={200}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+          />
+        )}
+      </Field>
       <label className="checkbox-label">
         <input
+          name="paidAnalysisEnabled"
+          autoComplete="off"
           type="checkbox"
           checked={enabled}
           onChange={(e) => setEnabled(e.target.checked)}
