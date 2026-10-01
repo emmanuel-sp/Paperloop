@@ -7,8 +7,21 @@ import { createApp } from '../app.js';
 const connectionSecret = 'project-route-test-secret';
 const authorization = `Bearer ${connectionSecret}`;
 
-function makeApp(dataDirectory = mkdtempSync(join(tmpdir(), 'paperloop-projects-'))) {
+function makeApp(
+  dataDirectory = mkdtempSync(join(tmpdir(), 'paperloop-projects-')),
+) {
   return createApp({
+    githubApi: async (endpoint) => {
+      const [, , owner, name] = endpoint.split('/');
+      return {
+        owner: { login: owner },
+        name,
+        full_name: `${owner}/${name}`,
+        description: null,
+        private: false,
+        permissions: { pull: true },
+      };
+    },
     connectionSecret,
     logger: false,
     storage: { dataDirectory },
@@ -89,9 +102,9 @@ describe('project HTTP API', () => {
     });
     expect(historyResponse.statusCode).toBe(200);
     expect(
-      historyResponse.json().contexts.map((context: { version: number }) =>
-        context.version,
-      ),
+      historyResponse
+        .json()
+        .contexts.map((context: { version: number }) => context.version),
     ).toEqual([3, 2, 1]);
     await firstApp.close();
 
@@ -111,7 +124,9 @@ describe('project HTTP API', () => {
   });
 
   it('registers an available local directory without requiring Git', async () => {
-    const localDirectory = mkdtempSync(join(tmpdir(), 'paperloop-local-project-'));
+    const localDirectory = mkdtempSync(
+      join(tmpdir(), 'paperloop-local-project-'),
+    );
     const app = makeApp();
     const response = await app.inject({
       headers: { authorization },
@@ -206,7 +221,10 @@ describe('project HTTP API', () => {
 
   it('does not allow unauthenticated project access', async () => {
     const app = makeApp();
-    const response = await app.inject({ method: 'GET', url: '/api/v1/projects' });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/projects',
+    });
     expect(response.statusCode).toBe(401);
     await app.close();
   });

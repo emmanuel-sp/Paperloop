@@ -1,6 +1,10 @@
 import { AutoTextarea } from '../components/AutoTextarea';
 import { useState, type FormEvent } from 'react';
-import type { CreateProjectRequest } from '@paperloop/contracts';
+import type {
+  CreateProjectRequest,
+  GithubRepository,
+} from '@paperloop/contracts';
+import { GithubRepositoryPicker } from './GithubRepositoryPicker';
 
 interface ProjectFormProps {
   error?: string | undefined;
@@ -19,13 +23,13 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
   const [repositoryKind, setRepositoryKind] = useState<
     'none' | 'local' | 'github'
   >('none');
+  const [github, setGithub] = useState<GithubRepository | null>(null);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const localPath = String(form.get('localPath') ?? '').trim();
-    const githubOwner = String(form.get('githubOwner') ?? '').trim();
-    const githubRepository = String(form.get('githubRepository') ?? '').trim();
+    if (repositoryKind === 'github' && !github) return;
 
     onSubmit({
       name: String(form.get('name') ?? ''),
@@ -34,12 +38,12 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
       constraints: lines(String(form.get('constraints') ?? '')),
       ...(repositoryKind === 'local'
         ? { repository: { kind: 'local', path: localPath } }
-        : repositoryKind === 'github'
+        : repositoryKind === 'github' && github
           ? {
               repository: {
                 kind: 'github',
-                owner: githubOwner,
-                repository: githubRepository,
+                owner: github.owner,
+                repository: github.repository,
               },
             }
           : {}),
@@ -134,26 +138,7 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
             </label>
           ) : null}
           {repositoryKind === 'github' ? (
-            <div className="form-columns">
-              <label>
-                GitHub owner
-                <input
-                  autoComplete="off"
-                  name="githubOwner"
-                  required
-                  placeholder="openai"
-                />
-              </label>
-              <label>
-                Repository
-                <input
-                  autoComplete="off"
-                  name="githubRepository"
-                  required
-                  placeholder="example"
-                />
-              </label>
-            </div>
+            <GithubRepositoryPicker selected={github} onChange={setGithub} />
           ) : null}
         </fieldset>
         {error ? (
@@ -162,7 +147,11 @@ export function ProjectForm({ error, isPending, onSubmit }: ProjectFormProps) {
           </p>
         ) : null}
         <div className="form-actions">
-          <button className="button primary" disabled={isPending} type="submit">
+          <button
+            className="button primary"
+            disabled={isPending || (repositoryKind === 'github' && !github)}
+            type="submit"
+          >
             {isPending ? 'Creating project…' : 'Create project'}
           </button>
         </div>

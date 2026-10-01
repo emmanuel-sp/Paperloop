@@ -6,6 +6,7 @@ async function connect(page: Page) {
   await expect(
     page.getByRole('heading', { name: 'Overview', exact: true }),
   ).toBeVisible();
+  await page.getByRole('combobox', { name: 'Project', exact: true }).selectOption({ label: 'Retrieval lab' });
 }
 test('navigation, paper evidence, keyboard focus, and narrow layouts', async ({
   page,

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { scheduleConfigSchema } from '../../packages/contracts/dist/index.js';
 import { createApp } from '../../apps/server/dist/app.js';
+import { GithubAccessError } from '../../apps/server/dist/projects/github-service.js';
 const root = mkdtempSync(join(tmpdir(), 'paperloop-browser-'));
 const repository = join(root, 'repository');
 execFileSync('git', ['init', repository]);
@@ -20,6 +21,7 @@ print('Python evaluation complete')
 `,
 );
 execFileSync('git', ['-C', repository, 'add', '.']);
+execFileSync('git', ['-C', repository, 'remote', 'add', 'origin', 'https://github.com/research-team/private-lab.git']);
 execFileSync('git', [
   '-C',
   repository,
@@ -31,12 +33,40 @@ execFileSync('git', [
   '-m',
   'fixture',
 ]);
+let githubState = 'connected';
+const githubRepos = ['private-lab', 'public-lab'].map((name) => ({
+  name, owner: { login: 'research-team' }, full_name: `research-team/${name}`,
+  description: 'Controlled GitHub repository fixture', private: name === 'private-lab',
+  default_branch: 'main', permissions: { pull: true },
+}));
 const app = createApp({
+  githubApi: async (endpoint) => {
+    const failures = {
+      disconnected: ['GITHUB_DISCONNECTED', 'Sign in with GitHub CLI on the computer running Paperloop, then retry.', 503],
+      expired: ['GITHUB_EXPIRED', 'Your GitHub sign-in has expired. Sign in again, then retry.', 503],
+      denied: ['GITHUB_ACCESS_DENIED', 'This GitHub connection cannot read the requested repository.', 403],
+      limited: ['GITHUB_RATE_LIMITED', 'GitHub is limiting requests. Wait before retrying.', 429],
+    };
+    if (failures[githubState]) throw new GithubAccessError(...failures[githubState]);
+    if (endpoint === '/user') return { login: 'fixture-user' };
+    if (endpoint.startsWith('/user/repos')) return githubRepos;
+    if (endpoint.startsWith('/search/')) {
+      const query = new URL(`https://api.github.com${endpoint}`).searchParams.get('q');
+      return { items: githubRepos.filter((repo) => repo.full_name.includes(query)) };
+    }
+    const repo = githubRepos.find((value) => endpoint === `/repos/${value.full_name}`);
+    if (!repo) throw new GithubAccessError('GITHUB_ACCESS_DENIED', 'This GitHub connection cannot read the requested repository.', 403);
+    return repo;
+  },
   connectionSecret: 'browser-fixture-secret',
   logger: false,
   dispatcher: false,
   storage: { dataDirectory: join(root, 'data') },
   webRoot: fileURLToPath(new URL('../../apps/web/dist', import.meta.url)),
+});
+app.post('/__test/github', async (request) => {
+  githubState = request.body.state;
+  return { repository };
 });
 const project = app.projects.create({
   name: 'Retrieval lab',

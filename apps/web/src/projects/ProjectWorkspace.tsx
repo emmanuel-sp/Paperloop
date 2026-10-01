@@ -113,7 +113,11 @@ export function ProjectWorkspace({
               </Link>
             }
           />
-          <ExperimentWorkspace key={project.id} projectId={project.id} />
+          <ExperimentWorkspace
+            key={project.id}
+            projectId={project.id}
+            repository={project.repository}
+          />
           <Dialog
             open={params.get('view') === 'evaluation'}
             title="Evaluation"

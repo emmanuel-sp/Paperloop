@@ -13,6 +13,12 @@ import { ExperimentService } from './experiments/experiment-service.js';
 import { registerWorkflowRoutes } from './experiments/workflow-routes.js';
 import { registerProjectMcp } from './mcp/project-mcp.js';
 import { registerProjectRoutes } from './projects/project-routes.js';
+import { registerGithubRoutes } from './projects/github-routes.js';
+import {
+  GithubAccessError,
+  GithubService,
+  type GithubApi,
+} from './projects/github-service.js';
 import {
   InvalidRepositoryError,
   ProjectNotFoundError,
@@ -49,6 +55,7 @@ declare module 'fastify' {
 }
 
 export interface CreateAppOptions {
+  githubApi?: GithubApi;
   connectionSecret?: string;
   researchFetcher?: PublicFetcher;
   logger?: boolean;
@@ -186,7 +193,9 @@ export function createApp(options: CreateAppOptions = {}) {
     return reply.code(204).send();
   });
 
-  registerProjectRoutes(app, projectService);
+  const github = new GithubService(options.githubApi);
+  registerGithubRoutes(app, github);
+  registerProjectRoutes(app, projectService, github);
   registerResearchRoutes(app, researchService);
   registerDiscoveryRoutes(app, discovery, researchService);
   registerWorkflowRoutes(app, plans, experiments);
@@ -202,6 +211,10 @@ export function createApp(options: CreateAppOptions = {}) {
   );
 
   app.setErrorHandler(async (error, request, reply) => {
+    if (error instanceof GithubAccessError)
+      return reply
+        .code(error.statusCode)
+        .send({ code: error.code, message: error.message });
     if (error instanceof SourceFetchError)
       return reply
         .code(400)

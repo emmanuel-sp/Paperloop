@@ -27,7 +27,11 @@ import {
   evaluationRuns,
   experimentComparisons,
 } from '../storage/schema.js';
-import { codeIdentity, prepareWorkspaces } from './workspaces.js';
+import {
+  codeIdentity,
+  githubCheckout,
+  prepareWorkspaces,
+} from './workspaces.js';
 
 export class ExperimentService {
   private readonly active = new Map<string, Execution>();
@@ -186,15 +190,25 @@ export class ExperimentService {
         item.status !== 'completed',
     );
     if (existing) return this.detail(existing.id);
-    if (!project.repository || project.repository.kind !== 'local')
+    const sourcePath =
+      project.repository?.kind === 'local'
+        ? project.repository.path
+        : project.repository?.kind === 'github' && input.checkoutPath
+          ? githubCheckout(
+              input.checkoutPath,
+              project.repository.owner,
+              project.repository.repository,
+            )
+          : null;
+    if (!sourcePath)
       throw new WorkflowError(
         'LOCAL_REPOSITORY_REQUIRED',
-        'Register an available local repository before preparing an experiment.',
+        'Choose a local checkout of the GitHub repository, or register an available local repository, before preparing an experiment.',
       );
     const id = reservedId ?? randomUUID();
     const workspace = prepareWorkspaces(
       join(this.database.dataDirectory, 'experiments', id),
-      project.repository.path,
+      sourcePath,
       input.baselineRevision,
       input.isolatedCopy,
     );

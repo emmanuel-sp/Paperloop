@@ -132,6 +132,64 @@ async function settle(
 }
 
 describe('milestone 2 experiment loop', () => {
+  it('uses a matching local checkout while preserving GitHub research context and approval', async () => {
+    const { app, project, paper, plan, repository } = await fixture();
+    app.projects.registerRepository(project.id, {
+      kind: 'github',
+      owner: 'research-team',
+      repository: 'private-lab',
+    });
+    const input = {
+      documentId: paper.id,
+      planId: plan.id,
+      checkoutPath: repository,
+    };
+    expect(() => app.experiments.create(project.id, input)).toThrow(/approve/i);
+    app.plans.approve(plan.id, plan.fingerprint);
+    expect(() =>
+      app.experiments.create(project.id, {
+        ...input,
+        checkoutPath: 'relative/path',
+      }),
+    ).toThrow(/absolute/);
+    expect(() => app.experiments.create(project.id, input)).toThrow(
+      /origin matching/,
+    );
+    execFileSync('git', [
+      '-C',
+      repository,
+      'remote',
+      'add',
+      'origin',
+      'git@github.com:another-team/private-lab.git',
+    ]);
+    expect(() => app.experiments.create(project.id, input)).toThrow(
+      /origin matching/,
+    );
+    expect(app.experiments.list(project.id)).toHaveLength(0);
+    execFileSync('git', [
+      '-C',
+      repository,
+      'remote',
+      'set-url',
+      'origin',
+      'git@github.com:research-team/private-lab.git',
+    ]);
+    const detail = app.experiments.create(project.id, input);
+    expect(app.projects.get(project.id).repository).toEqual({
+      kind: 'github',
+      owner: 'research-team',
+      repository: 'private-lab',
+    });
+    expect(detail.experiment.contextId).toBe(
+      app.projects.get(project.id).currentContext.id,
+    );
+    expect(detail.experiment.baselinePath).not.toBe(repository);
+    expect(
+      readFileSync(join(detail.experiment.baselinePath, 'score.txt'), 'utf8'),
+    ).toBe('10');
+    expect(readFileSync(join(repository, 'score.txt'), 'utf8')).toBe('99');
+  });
   it('persists uncertain process cleanup as interrupted and blocks retries until reconciliation', async () => {
     const { app, project, paper, plan } = await fixture();
     app.plans.approve(plan.id, plan.fingerprint);

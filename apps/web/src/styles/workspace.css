@@ -1112,3 +1112,48 @@ h3 {
     padding: 24px;
   }
 }
+.github-picker {
+  display: grid;
+  gap: var(--space-4, 1rem);
+  min-width: 0;
+}
+
+.github-picker p {
+  margin: 0;
+}
+.github-picker code {
+  overflow-wrap: anywhere;
+}
+.github-connection {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.github-repositories {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+  max-height: 24rem;
+  overflow-y: auto;
+}
+.github-repositories button {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 1rem;
+  text-align: left;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--field-border);
+  overflow-wrap: anywhere;
+}
+.github-repositories button[aria-pressed='true'] {
+  border-color: var(--ink);
+}
+.github-repositories span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}

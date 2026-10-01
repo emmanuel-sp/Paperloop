@@ -25,6 +25,9 @@ Generated `dist/`, `node_modules/`, and local application data stay out of Git. 
 
 ## Development
 
+See [GitHub connection and repository selection](docs/GITHUB.md) for local sign-in,
+private repository access, and choosing an execution checkout when needed.
+
 Use Node.js 24.15 or newer within Node 24 and pnpm 10.18.3. Corepack can supply the pinned pnpm version.
 
 ```bash

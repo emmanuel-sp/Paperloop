@@ -11,6 +11,41 @@ import {
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { WorkflowError } from '../evaluations/plan-service.js';
 
+export function githubCheckout(
+  path: string,
+  owner: string,
+  repository: string,
+): string {
+  if (!isAbsolute(path))
+    throw new WorkflowError(
+      'INVALID_CHECKOUT',
+      'Choose an absolute path to an existing checkout of the selected GitHub repository.',
+      400,
+    );
+  try {
+    const checkout = realpathSync(path);
+    const origin = git(checkout, ['remote', 'get-url', 'origin']);
+    const match = origin.match(
+      /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([^/]+)\/([^/]+?)\/?$/,
+    );
+    if (
+      !match ||
+      match[1]?.toLowerCase() !== owner.toLowerCase() ||
+      match[2]?.replace(/\.git$/, '').toLowerCase() !== repository.toLowerCase()
+    )
+      throw new Error('Mismatched origin');
+    // Require a committed Git checkout before any isolated workspace is made.
+    git(checkout, ['rev-parse', '--verify', 'HEAD^{commit}']);
+    return checkout;
+  } catch {
+    throw new WorkflowError(
+      'INVALID_CHECKOUT',
+      'The checkout must have a commit and an origin matching the selected GitHub repository. Check its path and remote, then retry.',
+      400,
+    );
+  }
+}
+
 export function git(path: string, args: string[]): string {
   return execFileSync('git', ['-C', path, ...args], {
     encoding: 'utf8',
