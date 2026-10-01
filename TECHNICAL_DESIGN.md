@@ -100,7 +100,22 @@ Long operations return a job or run ID. The UI polls active work through TanStac
 
 Fastify serves the compiled frontend from the same origin as the API. During development, Vite proxies API requests to the backend. Store project selection, tabs, and shareable filters in routes or query parameters; store presentation preferences locally.
 
-Build reusable workbench components around project navigation, research lists, detail panes, evaluation plans, experiment progress, and comparisons. Comparison results are a first-class view, not only text in an activity log. Clearly represent pending agent work, pending approval, interrupted runs, incomplete evidence, and unavailable sources.
+The approved workbench journey is connect a project → discover relevant research → start a contextual experiment → inspect evidence. Keep five project routes: `overview`, `research`, `experiments`, `schedules`, and `settings`. Research discovery is first class. Evaluation is a secondary capability within Experiments; paper import is tertiary within Research. Create experiments from contextual research/project actions; the Experiments tab displays work and evidence.
+
+| Existing destination | New home and compatibility mapping |
+| --- | --- |
+| Sources (`/sources`) | Research source controls (`/research?view=sources`) |
+| Library (`/library`, Research `view=library`) | Saved research within Research (`/research?view=library`) |
+| Evaluation plans (`/evaluations`, `/evaluation-plans`) | Evaluation within Experiments (`/experiments?view=evaluation`) |
+| Agent & API (`/agent-api`, prior `/settings`) | Settings (`/settings?view=agent-api`) |
+
+Use replacement redirects for retired routes and preserve query parameters such as paper and experiment identities. Keep URL state for selected items and focused secondary views. Compatibility query names and API paths remain stable; they do not imply separate navigation destinations. Migrate existing features into these homes before the detailed section redesigns; do not remove working approval or execution operations during that transition.
+
+Keep inference in project/research/evaluation services, sharing validated results through HTTP and MCP. Repository metadata/files and existing context can suggest objectives, constraints, research questions, source choices, and evaluation suites. Record source references, context version/revision, capture time, and uncertainty. Show editable summaries and ask only for missing information that blocks the next action. Metadata extraction should accept broad paper input, preserve provenance, and expose unresolved or failed extraction honestly.
+
+Inference never grants repository access, approves a command, establishes a client connection, enables paid calls, or supplies measured results. User confirmation remains necessary for repository selection/access, exact Evaluation version and fingerprints, spending activation/bounds, and automation rules. A local checkout is required only for execution; GitHub context uses locally authorized credentials and creates no Paperloop accounts. Missing API keys leave deterministic discovery/ingestion, saved state, agent handoffs, approved local execution, and comparison rendering available. Analysis or drafting waits for an agent or explicitly enabled provider when reasoning is required.
+
+Build shared accessible dialogs, fields, state messages, section headings, and focused action patterns under `apps/web/src/components`; keep feature compositions in their existing project/research/experiment/schedule boundaries. Use restrained surfaces, whitespace, soft shadows, readable typography, visible keyboard focus, and progressive disclosure. Dialogs must label their purpose, contain focus, dismiss by Escape and deliberate backdrop interaction, and restore focus to their trigger. Advanced controls and provenance are secondary. Give Overview, Research, Experiments, Schedules, and Settings specific layouts and state designs, reviewed with populated desktop/narrow fixtures. Comparison results are a first-class view. Clearly represent pending agent work, pending approval, interrupted runs, incomplete evidence, unavailable sources, and missing keys without implying execution.
 
 An action requiring agent reasoning creates persistent work and exposes the corresponding agent instructions. If no agent or enabled API-backed analysis is available, show that the work is waiting. The UI must not imply that an MCP connection alone can cause an idle agent to execute it.
 

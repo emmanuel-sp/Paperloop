@@ -46,7 +46,7 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
         <h2>Find research</h2>
         <p className="muted">
           {sources.data?.sources.length ?? 0} sources selected.{' '}
-          <Link to={`/projects/${projectId}/sources`}>Manage sources</Link>
+          <Link to={`/projects/${projectId}/research?view=sources`}>Manage sources</Link>
         </p>
       </div>
       <form className="research-form" onSubmit={submit}>

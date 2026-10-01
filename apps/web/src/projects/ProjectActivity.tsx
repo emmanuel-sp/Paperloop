@@ -51,7 +51,7 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
         title: `Review ${p.configuration.name}`,
         description:
           'Approve the command and inputs before an experiment can use this plan.',
-        route: 'evaluations',
+        route: 'experiments?view=evaluation',
         kind: 'approval',
       })),
     ...experiments
@@ -109,8 +109,8 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
     <>
       <div className="stat-grid">
         {[
-          ['Papers in library', papers.length, 'research?view=library'],
-          ['Evaluation plans', plans.length, 'evaluations'],
+          ['Saved research', papers.length, 'research?view=library'],
+          ['Evaluation', plans.length, 'experiments?view=evaluation'],
           ['Experiments', experiments.length, 'experiments'],
           [
             'Active schedules',
@@ -158,18 +158,18 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
             <h3>
               {papers.length
                 ? 'Ready for your next idea'
-                : 'Start with a paper'}
+                : 'Discover your next idea'}
             </h3>
             <p>
               {papers.length
                 ? 'Review research, approve an evaluation plan, and test a focused change.'
-                : 'Add a paper or search your selected sources to find something worth testing.'}
+                : 'Discover research relevant to your project, then choose a focused change to test.'}
             </p>
             <Link
               className="button primary"
-              to={`/projects/${projectId}/research?view=${papers.length ? 'recommendations' : 'supply'}`}
+              to={`/projects/${projectId}/research?view=${papers.length ? 'recommendations' : 'discovery'}`}
             >
-              {papers.length ? 'Review ideas' : 'Add research'}
+              {papers.length ? 'Review ideas' : 'Discover research'}
             </Link>
           </div>
         )}

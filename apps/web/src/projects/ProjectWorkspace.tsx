@@ -1,7 +1,6 @@
 import { ScheduleWorkspace } from '../schedules/ScheduleWorkspace';
 import type { Project } from '@paperloop/contracts';
-import { Link } from 'react-router';
-import { SourceWorkspace } from '../research/SourceWorkspace';
+import { Link, useSearchParams } from 'react-router';
 import { ResearchWorkspace } from '../research/ResearchWorkspace';
 import { EvaluationWorkspace } from '../evaluations/EvaluationWorkspace';
 import { ExperimentWorkspace } from '../experiments/ExperimentWorkspace';
@@ -17,6 +16,7 @@ export function ProjectWorkspace({
   activeTab,
   project,
 }: ProjectWorkspaceProps) {
+  const [params] = useSearchParams();
   return (
     <>
       <header className="project-header">
@@ -44,18 +44,24 @@ export function ProjectWorkspace({
         </div>
       ) : activeTab === 'research' ? (
         <ResearchWorkspace key={project.id} projectId={project.id} />
-      ) : activeTab === 'sources' ? (
-        <SourceWorkspace key={project.id} projectId={project.id} />
+
       ) : activeTab === 'schedules' || activeTab === 'settings' ? (
         <ScheduleWorkspace
           key={`${project.id}-${activeTab}`}
           projectId={project.id}
           view={activeTab}
         />
-      ) : activeTab === 'evaluations' ? (
-        <EvaluationWorkspace key={project.id} projectId={project.id} />
+
       ) : activeTab === 'experiments' ? (
-        <ExperimentWorkspace key={project.id} projectId={project.id} />
+        <div className="research-stack">
+          <div className="section-heading">
+            <p className="muted">Review progress and the evidence for each change.</p>
+            <Link className="text-link" to={`/projects/${project.id}/experiments${params.get('view') === 'evaluation' ? '' : '?view=evaluation'}`}>
+              {params.get('view') === 'evaluation' ? 'Back to experiments' : 'Review Evaluation'}
+            </Link>
+          </div>
+          {params.get('view') === 'evaluation' ? <EvaluationWorkspace key={project.id} projectId={project.id} /> : <ExperimentWorkspace key={project.id} projectId={project.id} />}
+        </div>
       ) : null}
     </>
   );

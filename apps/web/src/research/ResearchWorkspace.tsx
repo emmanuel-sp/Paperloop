@@ -10,6 +10,7 @@ import {
   getResearchContent,
   listResearchDocuments,
 } from '../api/client';
+import { SourceWorkspace } from './SourceWorkspace';
 import { DiscoveryPanel } from './DiscoveryPanel';
 import { LibraryPanel } from './LibraryPanel';
 import { RecommendationPanel } from './RecommendationPanel';
@@ -21,9 +22,9 @@ import { AsyncState } from '../components/AsyncState';
 export function ResearchWorkspace({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
-  const views = ['discovery', 'recommendations', 'library', 'supply'] as const;
+  const views = ['discovery', 'recommendations', 'library', 'sources', 'supply'] as const;
   const rawView = params.get('view');
-  const view = views.find((item) => item === rawView) ?? 'library';
+  const view = views.find((item) => item === rawView) ?? 'discovery';
   const selectedId = params.get('paper') ?? undefined;
   const setSelectedId = (id: string) =>
     setParams((previous) => {
@@ -92,7 +93,8 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
               {
                 discovery: 'Discover',
                 recommendations: 'Recommendations',
-                library: 'Library',
+                library: 'Saved research',
+                sources: 'Sources',
                 supply: 'Add a paper',
               }[value]
             }
@@ -102,6 +104,7 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
       {selectedQuery.isError ? (
         <p role="alert">{errorMessage(selectedQuery.error)}</p>
       ) : null}
+      {view === 'sources' ? <SourceWorkspace projectId={projectId} /> : (
       <div className="research-layout">
         <div className="research-stack">
           {view === 'discovery' ? (
@@ -132,6 +135,7 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
           document={selected}
         />
       </div>
+      )}
     </div>
   );
 }

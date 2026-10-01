@@ -15,6 +15,7 @@ test('navigation, paper evidence, keyboard focus, and narrow layouts', async ({
   await connect(page);
   await expect(page.getByText('Review Retrieval quality')).toBeVisible();
   await page.getByRole('link', { name: 'Research', exact: true }).click();
+  await page.getByRole('button', { name: 'Saved research', exact: true }).click();
   await page
     .getByRole('button', { name: /A focused retrieval technique/ })
     .click();
@@ -35,14 +36,12 @@ test('navigation, paper evidence, keyboard focus, and narrow layouts', async ({
   await expect(page).toHaveURL(/view=recommendations/);
   await page.goBack();
   await expect(
-    page.getByRole('button', { name: 'Library', exact: true }),
+    page.getByRole('button', { name: 'Saved research', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   for (const name of [
-    'Evaluation plans',
     'Experiments',
     'Schedules',
-    'Sources',
-    'Agent & API',
+    'Settings',
   ]) {
     await page.getByRole('link', { name, exact: true }).click();
     await expect(
@@ -55,9 +54,8 @@ test('navigation, paper evidence, keyboard focus, and narrow layouts', async ({
     'Overview',
     'Research',
     'Schedules',
-    'Evaluation plans',
     'Experiments',
-    'Agent & API',
+    'Settings',
   ]) {
     await page.getByRole('link', { name, exact: true }).click();
     expect(
@@ -82,9 +80,8 @@ test('browser approval through a complete paid-call-free Python comparison', asy
   page,
 }) => {
   await connect(page);
-  await page
-    .getByRole('link', { name: 'Evaluation plans', exact: true })
-    .click();
+  await page.getByRole('link', { name: 'Experiments', exact: true }).click();
+  await page.getByRole('link', { name: 'Review Evaluation' }).click();
   await page.getByRole('button', { name: 'Approve version 1' }).click();
   await expect(page.getByText('Version 1 · Approved')).toBeVisible();
   await page.getByRole('link', { name: 'Experiments', exact: true }).click();
@@ -156,4 +153,20 @@ test('schedule setup and actionable validation errors', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: 'Resume', exact: true }),
   ).toBeVisible();
+});
+
+test('retired bookmarks preserve context within the five project sections', async ({ page }) => {
+  await connect(page);
+  const projectPath = new URL(page.url()).pathname.replace(/\/overview$/, '');
+  for (const [legacy, destination] of [
+    ['sources', 'research?paper=preserved&view=sources'],
+    ['library', 'research?paper=preserved&view=library'],
+    ['evaluations', 'experiments?paper=preserved&view=evaluation'],
+    ['evaluation-plans', 'experiments?paper=preserved&view=evaluation'],
+    ['agent-api', 'settings?paper=preserved&view=agent-api'],
+  ]) {
+    await page.goto(`${projectPath}/${legacy}?paper=preserved`);
+    await expect(page).toHaveURL(`${projectPath}/${destination}`);
+    await expect(page.getByRole('navigation', { name: 'Project sections' }).getByRole('link')).toHaveCount(5);
+  }
 });
