@@ -1,3 +1,5 @@
+import { AsyncState } from '../components/AsyncState';
+import { SectionHeading } from '../components/SectionHeading';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import {
@@ -30,18 +32,20 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
   });
   if (activity.isPending)
     return (
-      <p role="status" className="muted">
-        Loading project activity…
-      </p>
+      <AsyncState
+        kind="loading"
+        title="Checking project progress"
+        description="Loading research, decisions, and recent work…"
+      />
     );
   if (activity.isError)
     return (
-      <div className="form-error" role="alert">
-        Activity could not load.{' '}
-        <button className="button" onClick={() => void activity.refetch()}>
-          Try again
-        </button>
-      </div>
+      <AsyncState
+        kind="error"
+        title="Activity could not load"
+        description={activity.error.message}
+        action={{ label: 'Try again', onClick: () => void activity.refetch() }}
+      />
     );
   const { papers, plans, experiments, schedules } = activity.data;
   const notices = [
@@ -129,14 +133,17 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
         ))}
       </div>
       <section className="detail-panel">
-        <div className="section-heading">
-          <h2>Next steps</h2>
-          <span className="muted">
-            {notices.length
-              ? `${notices.length} to follow up`
-              : 'All caught up'}
-          </span>
-        </div>
+        <SectionHeading
+          title="Next steps"
+          description="Decisions and work that need your attention."
+          action={
+            <span className="muted">
+              {notices.length
+                ? `${notices.length} to follow up`
+                : 'All caught up'}
+            </span>
+          }
+        />
         {notices.length ? (
           <div className="activity-list">
             {notices.slice(0, 8).map((notice, i) => (

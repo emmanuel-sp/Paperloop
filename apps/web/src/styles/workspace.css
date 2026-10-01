@@ -1,6 +1,6 @@
 .app-frame {
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-columns: 232px minmax(0, 1fr);
   min-height: 100vh;
 }
 .project-sidebar {
@@ -11,7 +11,7 @@
   display: flex;
   flex-direction: column;
   padding: 28px 16px 22px;
-  background: #f0f1f6;
+  background: #eeefeb;
 }
 .brand {
   display: flex;
@@ -55,11 +55,13 @@
 }
 .section-nav a:hover,
 .new-project-link:hover {
-  background: #e7e9f1;
+  background: #e5e7e3;
 }
 .section-nav a.active {
-  color: var(--green);
-  background: #e5e4f8;
+  color: var(--accent);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-weight: 600;
 }
 .new-project-link {
   margin-top: 24px;
@@ -138,8 +140,8 @@
 .detail-panel,
 .form-panel,
 .state-card {
-  background: var(--paper);
-  border-radius: 10px;
+  background: var(--surface);
+  border-radius: var(--radius);
   box-shadow: var(--shadow);
   min-width: 0;
 }
@@ -183,7 +185,7 @@
   gap: 10px;
   padding: 20px 24px;
   background: white;
-  border-radius: 10px;
+  border-radius: var(--radius);
   box-shadow: var(--shadow);
   color: var(--ink);
   text-decoration: none;
@@ -210,7 +212,7 @@
   text-decoration: none;
 }
 .activity-row:hover strong {
-  color: var(--green);
+  color: var(--accent);
 }
 .activity-row strong {
   font-size: 13px;
@@ -264,9 +266,9 @@ li + li {
 }
 .state-card {
   max-width: 600px;
-  margin: 10vh auto;
-  padding: 40px;
-  text-align: center;
+  margin: 0;
+  padding: var(--space-section);
+  text-align: left;
 }
 .state-card p:not(.eyebrow) {
   color: var(--muted);
@@ -300,7 +302,7 @@ tbody tr + tr {
   border-top: 1px solid #eff0f5;
 }
 .workflow-notice {
-  background: #f5f3ff;
+  background: var(--accent-soft);
   padding: 16px;
   border-radius: 8px;
   margin: 16px 0;
@@ -310,7 +312,7 @@ tbody tr + tr {
   color: var(--muted);
 }
 .create-panel > summary {
-  color: var(--green);
+  color: var(--accent);
   font-size: 14px;
 }
 .create-panel {
@@ -343,14 +345,24 @@ tbody tr + tr {
     position: static;
     height: auto;
     padding: 20px 16px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+  .brand {
+    grid-column: 1 / -1;
   }
   .project-switcher {
-    margin: 20px 6px 16px;
+    margin: 0;
+    grid-column: 1;
+    grid-row: 2;
   }
   .section-nav {
     display: flex;
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding: 4px;
+    grid-column: 1 / -1;
+    grid-row: 3;
   }
   .section-nav a {
     white-space: nowrap;
@@ -359,7 +371,10 @@ tbody tr + tr {
     display: none;
   }
   .new-project-link {
-    margin: 12px 0 0;
+    margin: 0;
+    grid-row: 2;
+    grid-column: 2;
+    align-self: end;
   }
   .sidebar-footer {
     display: none;
@@ -398,5 +413,141 @@ h2 .workflow-status {
 @media (max-width: 700px) {
   .run-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+.section-heading {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.section-heading h3 {
+  margin: 0;
+}
+.section-description {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 8px 0 0;
+  max-width: 62ch;
+}
+.heading-action {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+.workspace > .state-card {
+  margin: 8vh auto;
+}
+.state-error {
+  background: #fff6f2;
+}
+.state-loading .eyebrow,
+.state-waiting .eyebrow {
+  color: var(--accent);
+}
+.overview-context {
+  padding: var(--space-section);
+}
+.overview-context .context-summary {
+  font-size: 18px;
+  line-height: 1.75;
+  max-width: 65ch;
+  margin-bottom: var(--space-large);
+}
+.activity-list {
+  display: grid;
+  gap: 4px;
+}
+.activity-row {
+  padding: 16px 12px;
+  border-radius: 8px;
+}
+.activity-row:hover {
+  background: var(--canvas);
+}
+.stat-card strong {
+  font-size: 24px;
+}
+.schedule-layout {
+  max-width: 960px;
+}
+.schedule-card {
+  padding: var(--space-large);
+  border-radius: var(--radius);
+  background: var(--canvas);
+}
+.schedule-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.schedule-card .section-heading {
+  margin-bottom: 0;
+}
+.schedule-setup {
+  font-weight: 550;
+}
+.schedule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-small);
+}
+.settings-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  max-width: 1120px;
+}
+.settings-layout > .section-heading,
+.settings-layout > .automation-settings,
+.settings-layout > .state-card,
+.settings-layout > [role='alert'] {
+  grid-column: 1 / -1;
+}
+.settings-layout .agent-guide code {
+  display: block;
+  margin-bottom: var(--space-medium);
+}
+.comparison-panel h2 {
+  font-size: 24px;
+}
+.comparison-panel caption {
+  text-align: left;
+  padding: 0 0 16px;
+}
+.table-scroll {
+  max-width: 100%;
+}
+@media (max-width: 1050px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .overview-context {
+    padding: 24px;
+  }
+  .overview-context .context-summary {
+    font-size: 16px;
+  }
+  .section-heading {
+    gap: 12px;
+  }
+  .schedule-card {
+    padding: 20px;
+  }
+  .state-card {
+    padding: 24px;
+  }
+}
+
+.table-hint {
+  display: none;
+}
+@media (max-width: 700px) {
+  .table-hint {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 12px 0;
   }
 }

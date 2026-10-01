@@ -1,3 +1,5 @@
+import { Field } from '../components/Field';
+import { SectionHeading } from '../components/SectionHeading';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
@@ -41,24 +43,32 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
   }
   return (
     <section className="detail-panel research-stack">
-      <div>
-        <p className="eyebrow">Discovery</p>
-        <h2>Find research</h2>
-        <p className="muted">
-          {sources.data?.sources.length ?? 0} sources selected.{' '}
-          <Link to={`/projects/${projectId}/research?view=sources`}>Manage sources</Link>
-        </p>
-      </div>
+      <SectionHeading
+        eyebrow="Discovery"
+        title="Find research"
+        description="Explore ideas you can assess against this project’s goals."
+      />
+      <p className="muted">
+        {sources.data?.sources.length ?? 0} sources selected.{' '}
+        <Link to={`/projects/${projectId}/research?view=sources`}>
+          Manage sources
+        </Link>
+      </p>
       <form className="research-form" onSubmit={submit}>
-        <label>
-          Research question
-          <input
-            value={query}
-            maxLength={500}
-            placeholder="A topic or project objective"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+        <Field
+          label="Research question"
+          hint="Search public sources without a model API key. Analysis waits for an available agent or an explicitly enabled provider."
+        >
+          {(attributes) => (
+            <input
+              {...attributes}
+              value={query}
+              maxLength={500}
+              placeholder="A topic or project objective"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          )}
+        </Field>
         <button
           className="button primary"
           disabled={search.isPending || !sources.data?.sources.length}

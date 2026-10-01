@@ -5,6 +5,8 @@ import { ResearchWorkspace } from '../research/ResearchWorkspace';
 import { EvaluationWorkspace } from '../evaluations/EvaluationWorkspace';
 import { ExperimentWorkspace } from '../experiments/ExperimentWorkspace';
 
+import { Dialog } from '../components/Dialog';
+import { SectionHeading } from '../components/SectionHeading';
 import { projectSections } from './navigation';
 import { ProjectActivity } from './ProjectActivity';
 interface ProjectWorkspaceProps {
@@ -16,7 +18,9 @@ export function ProjectWorkspace({
   activeTab,
   project,
 }: ProjectWorkspaceProps) {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const evaluationParams = new URLSearchParams(params);
+  evaluationParams.set('view', 'evaluation');
   return (
     <>
       <header className="project-header">
@@ -44,23 +48,41 @@ export function ProjectWorkspace({
         </div>
       ) : activeTab === 'research' ? (
         <ResearchWorkspace key={project.id} projectId={project.id} />
-
       ) : activeTab === 'schedules' || activeTab === 'settings' ? (
         <ScheduleWorkspace
           key={`${project.id}-${activeTab}`}
           projectId={project.id}
           view={activeTab}
         />
-
       ) : activeTab === 'experiments' ? (
         <div className="research-stack">
-          <div className="section-heading">
-            <p className="muted">Review progress and the evidence for each change.</p>
-            <Link className="text-link" to={`/projects/${project.id}/experiments${params.get('view') === 'evaluation' ? '' : '?view=evaluation'}`}>
-              {params.get('view') === 'evaluation' ? 'Back to experiments' : 'Review Evaluation'}
-            </Link>
-          </div>
-          {params.get('view') === 'evaluation' ? <EvaluationWorkspace key={project.id} projectId={project.id} /> : <ExperimentWorkspace key={project.id} projectId={project.id} />}
+          <SectionHeading
+            title="Progress & evidence"
+            description="Inspect a focused change and decide what the results support."
+            action={
+              <Link
+                className="button tertiary"
+                to={`/projects/${project.id}/experiments?${evaluationParams}`}
+              >
+                Review Evaluation
+              </Link>
+            }
+          />
+          <ExperimentWorkspace key={project.id} projectId={project.id} />
+          <Dialog
+            open={params.get('view') === 'evaluation'}
+            title="Evaluation"
+            description="Review the exact metrics, inputs, and command before approving a version."
+            wide
+            onClose={() =>
+              setParams((previous) => {
+                previous.delete('view');
+                return previous;
+              })
+            }
+          >
+            <EvaluationWorkspace key={project.id} projectId={project.id} />
+          </Dialog>
         </div>
       ) : null}
     </>
@@ -81,8 +103,11 @@ function ContextBadge({ project }: { project: Project }) {
 function ProjectOverview({ project }: { project: Project }) {
   return (
     <div className="overview-grid">
-      <section className="detail-panel overview-main">
-        <h2>Project context</h2>
+      <section className="detail-panel overview-main overview-context">
+        <SectionHeading
+          eyebrow="Working context"
+          title="What you’re building"
+        />
         <p className="context-summary">
           {project.description || project.currentContext.summary}
         </p>

@@ -7,6 +7,8 @@ export default defineConfig({
   timeout: 45000,
   use: {
     baseURL: 'http://127.0.0.1:43187',
+    locale: 'en-US',
+    timezoneId: 'America/Los_Angeles',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

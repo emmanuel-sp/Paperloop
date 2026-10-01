@@ -1,3 +1,5 @@
+import { AsyncState } from '../components/AsyncState';
+import { SectionHeading } from '../components/SectionHeading';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -164,7 +166,7 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
           </form>
         </details>
         <section className="detail-panel">
-          <h2>Experiments</h2>
+          <SectionHeading eyebrow="Work history" title="Experiments" />
           {experiments.isPending ? (
             <p role="status">Loading experiments…</p>
           ) : null}
@@ -354,7 +356,10 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
               ) : null}
             </section>
             {detail.data.comparisons.map((comparison) => (
-              <section className="detail-panel" key={comparison.id}>
+              <section
+                className="detail-panel comparison-panel"
+                key={comparison.id}
+              >
                 <p className="eyebrow">Comparison</p>
                 <h2>
                   <WorkflowStatus value={comparison.outcome} />
@@ -362,7 +367,12 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
                 {comparison.reasons.map((reason) => (
                   <p key={reason}>{reason}</p>
                 ))}
-                <div className="table-scroll">
+                <div
+                  className="table-scroll"
+                  role="region"
+                  aria-label="Metric comparison"
+                  tabIndex={0}
+                >
                   <table>
                     <caption className="muted">
                       Measured results under this evaluation plan
@@ -400,6 +410,9 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
                     </tbody>
                   </table>
                 </div>
+                <p className="table-hint">
+                  Scroll the comparison to see all columns.
+                </p>
                 <details>
                   <summary>Compared run identities</summary>
                   <small>
@@ -463,13 +476,32 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
             </div>
           </>
         ) : (
-          <section className="detail-panel">
-            <h2>Complete the experiment loop</h2>
-            <p>
-              Create and approve an evaluation plan, then prepare an experiment
-              for a supplied paper.
-            </p>
-          </section>
+          <AsyncState
+            kind={detail.isError ? 'error' : id ? 'loading' : 'empty'}
+            eyebrow="Experiment evidence"
+            title={
+              detail.isError
+                ? 'Experiment could not load'
+                : id
+                  ? 'Loading experiment'
+                  : 'A focused change, measured'
+            }
+            description={
+              detail.isError
+                ? detail.error.message
+                : id
+                  ? 'Retrieving progress and recorded results…'
+                  : 'Review relevant research and an approved Evaluation before testing a change. Baseline, candidate, and measured results will appear here.'
+            }
+            {...(detail.isError
+              ? {
+                  action: {
+                    label: 'Try again',
+                    onClick: () => void detail.refetch(),
+                  },
+                }
+              : {})}
+          />
         )}
         {artifact ? (
           <section className="detail-panel">

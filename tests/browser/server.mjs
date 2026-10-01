@@ -1,9 +1,11 @@
 /* global process, console, URL */
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { setTimeout as delay } from 'node:timers/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { scheduleConfigSchema } from '../../packages/contracts/dist/index.js';
 import { createApp } from '../../apps/server/dist/app.js';
 const root = mkdtempSync(join(tmpdir(), 'paperloop-browser-'));
 const repository = join(root, 'repository');
@@ -71,7 +73,7 @@ app.discovery.storeRecommendation(project.id, {
   ],
   projectContextVersion: project.currentContext.version,
 });
-app.plans.draft(project.id, {
+const plan = app.plans.draft(project.id, {
   name: 'Retrieval quality',
   datasetIdentity: 'fixture-v1',
   cases: ['sample-1'],
@@ -107,6 +109,57 @@ app.post('/__test/implement/:id', async (request) => {
     'Implemented the candidate in its isolated workspace.',
     true,
   );
+});
+// A bounded test-only fixture for independently reproducible populated review.
+app.post('/__test/foundations', async () => {
+  let detail = app.experiments
+    .list(project.id)
+    .map((item) => app.experiments.detail(item.id))
+    .find((item) => item.comparisons.length);
+  if (!detail) {
+    app.plans.approve(plan.id, plan.fingerprint);
+    const experiment = app.experiments.create(project.id, {
+      documentId: paper.id,
+      planId: plan.id,
+    });
+    const id = experiment.experiment.id;
+    const settle = async (run) => {
+      for (let attempt = 0; attempt < 500; attempt++) {
+        const result = app.experiments.run(run.id);
+        if (result.status !== 'running') {
+          if (result.status !== 'completed')
+            throw new Error(result.error ?? 'Fixture evaluation failed');
+          return result;
+        }
+        await delay(20);
+      }
+      throw new Error('Fixture evaluation timed out');
+    };
+    const baseline = await settle(app.experiments.startRun(id, 'baseline'));
+    const claimed = app.experiments.claim(id, 'foundation-fixture-agent');
+    writeFileSync(join(claimed.experiment.candidatePath, 'score.txt'), '12');
+    app.experiments.progress(
+      id,
+      claimed.experiment.claimToken,
+      'Applied a synthetic test change in the isolated checkout.',
+      true,
+    );
+    const candidate = await settle(app.experiments.startRun(id, 'candidate'));
+    app.experiments.compare(id, baseline.id, candidate.id);
+    detail = app.experiments.detail(id);
+  }
+  if (!app.schedules.list(project.id).schedules.length) {
+    const value = app.schedules.create(
+      project.id,
+      scheduleConfigSchema.parse({ timezone: 'America/Los_Angeles' }),
+    );
+    app.schedules.setState(value.schedule.id, 'paused');
+  }
+  return {
+    projectId: project.id,
+    experimentId: detail.experiment.id,
+    paperId: paper.id,
+  };
 });
 await app.listen({ host: '127.0.0.1', port: 43187 });
 console.log('Browser fixture ready');

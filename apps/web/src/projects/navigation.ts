@@ -32,7 +32,10 @@ export const projectSections = [
 ] as const;
 
 // Keep retired bookmarks usable while the five sections become their new homes.
-export const retiredProjectSections: Record<string, { slug: string; view: string }> = {
+export const retiredProjectSections: Record<
+  string,
+  { slug: string; view: string }
+> = {
   sources: { slug: 'research', view: 'sources' },
   library: { slug: 'research', view: 'library' },
   evaluations: { slug: 'experiments', view: 'evaluation' },

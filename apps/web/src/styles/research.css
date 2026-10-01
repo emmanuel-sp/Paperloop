@@ -7,9 +7,10 @@
   background: transparent;
   color: var(--muted);
 }
-.research-view-nav .button[aria-pressed='true'] {
-  background: #e9e8fb;
-  color: var(--green);
+.research-view-nav .button[aria-pressed="true"] {
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--accent);
 }
 .research-layout {
   display: grid;
@@ -40,9 +41,9 @@
   background: #efeffa;
 }
 .research-item.active,
-.research-item[aria-pressed='true'] {
-  background: var(--mint);
-  color: var(--green);
+.research-item[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .research-item span {
   font-weight: 550;
@@ -136,5 +137,43 @@
   .research-detail {
     position: static;
     max-height: none;
+  }
+}
+
+.research-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.research-view-nav {
+  gap: 4px;
+}
+.research-detail .detail-title-row h2 {
+  font-size: 24px;
+  line-height: 1.4;
+}
+.research-detail .content-section {
+  margin-top: 32px;
+}
+.recommendation-card {
+  padding: 24px;
+  background: var(--canvas);
+}
+.research-item {
+  padding: 16px;
+  margin-top: 8px;
+  background: var(--canvas);
+}
+@media (max-width: 700px) {
+  .research-toolbar {
+    gap: 8px;
+  }
+  .research-toolbar > .form-actions {
+    justify-content: flex-start;
+  }
+  .research-detail .detail-title-row h2 {
+    font-size: 21px;
   }
 }

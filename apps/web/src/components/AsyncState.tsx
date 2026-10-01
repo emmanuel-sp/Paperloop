@@ -1,4 +1,5 @@
 interface AsyncStateProps {
+  kind?: 'empty' | 'loading' | 'error' | 'waiting';
   action?: { label: string; onClick(): void };
   description: string;
   eyebrow?: string;
@@ -6,13 +7,18 @@ interface AsyncStateProps {
 }
 
 export function AsyncState({
+  kind = 'empty',
   action,
   description,
   eyebrow = 'Project workspace',
   title,
 }: AsyncStateProps) {
   return (
-    <section className="state-card" aria-live="polite">
+    <section
+      className={`state-card state-${kind}`}
+      role={kind === 'error' ? 'alert' : 'status'}
+      aria-busy={kind === 'loading'}
+    >
       <p className="eyebrow">{eyebrow}</p>
       <h2>{title}</h2>
       <p>{description}</p>

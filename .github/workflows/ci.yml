@@ -31,6 +31,12 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:browser
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: workbench-foundations-${{ matrix.os }}
+          path: test-results/foundations/
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: browser-failure-${{ matrix.os }}

@@ -1,3 +1,4 @@
+import { Field } from '../components/Field';
 import { useState } from 'react';
 import type { ApiActivation } from '@paperloop/contracts';
 export function ApiActivationForm({
@@ -43,15 +44,20 @@ export function ApiActivationForm({
           <option value="anthropic">Anthropic</option>
         </select>
       </label>
-      <label>
-        Model identifier
-        <input
-          required
-          maxLength={200}
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-        />
-      </label>
+      <Field
+        label="Model identifier"
+        hint="Choose a model supported by your configured provider. This field contains no credentials."
+      >
+        {(attributes) => (
+          <input
+            {...attributes}
+            required
+            maxLength={200}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+          />
+        )}
+      </Field>
       <label className="checkbox-label">
         <input
           type="checkbox"
