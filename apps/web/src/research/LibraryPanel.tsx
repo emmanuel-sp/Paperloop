@@ -40,7 +40,7 @@ export function LibraryPanel({
     <section className="detail-panel research-stack">
       <div>
         <p className="eyebrow">Local library</p>
-        <h2>Search indexed research</h2>
+        <h2>Your research library</h2>
       </div>
       <form className="research-form" onSubmit={submit}>
         <label>
@@ -90,7 +90,14 @@ export function LibraryPanel({
           ))}
         </div>
       ) : (
-        <p className="muted">No matching documents.</p>
+        <div className="empty-inline">
+          <h3>{query ? 'No matching papers' : 'Your library is empty'}</h3>
+          <p>
+            {query
+              ? 'Try a shorter search or search across all projects.'
+              : 'Add a paper or discover research from your selected sources.'}
+          </p>
+        </div>
       )}
       {attach.isError ? <p role="alert">{errorMessage(attach.error)}</p> : null}
       <div className="form-actions">

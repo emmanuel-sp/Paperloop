@@ -42,10 +42,13 @@ export function RecommendationPanel({
           />
         ))
       ) : (
-        <p className="muted">
-          Collected material waits for an agent to assess applicability. Saved
-          and dismissed decisions survive future searches.
-        </p>
+        <div className="empty-inline">
+          <h3>No recommendations yet</h3>
+          <p>
+            Ask your connected agent to assess the papers in your library
+            against this project’s objectives.
+          </p>
+        </div>
       )}
       <div className="form-actions">
         <button
@@ -100,50 +103,53 @@ function RecommendationCard({
         <h4>Applicability</h4>
         <p>{item.proposal.applicability}</p>
       </div>
-      <div>
-        <h4>Prerequisites</h4>
-        {item.proposal.prerequisites.length ? (
+      <details>
+        <summary>Evidence, prerequisites & evaluation targets</summary>
+        <div>
+          <h4>Prerequisites</h4>
+          {item.proposal.prerequisites.length ? (
+            <ul>
+              {item.proposal.prerequisites.map((value) => (
+                <li key={value}>{value}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>None reported.</p>
+          )}
+        </div>
+        <div>
+          <h4>Uncertainty</h4>
+          <p>{item.proposal.uncertainty}</p>
+        </div>
+        <div>
+          <h4>Evaluation targets</h4>
           <ul>
-            {item.proposal.prerequisites.map((value) => (
+            {item.proposal.evaluationTargets.map((value) => (
               <li key={value}>{value}</li>
             ))}
           </ul>
-        ) : (
-          <p>None reported.</p>
-        )}
-      </div>
-      <div>
-        <h4>Uncertainty</h4>
-        <p>{item.proposal.uncertainty}</p>
-      </div>
-      <div>
-        <h4>Evaluation targets</h4>
-        <ul>
-          {item.proposal.evaluationTargets.map((value) => (
-            <li key={value}>{value}</li>
+        </div>
+        <div>
+          <h4>Source claims</h4>
+          <p className="muted">
+            Claims from research; benefits have not been measured in this
+            project unless supported by an experiment.
+          </p>
+          {item.proposal.sources.map((source, index) => (
+            <div key={`${source.documentId}:${index}`}>
+              <SourceLink
+                projectId={item.projectId}
+                documentId={source.documentId}
+                sourceVersion={source.sourceVersion}
+              />
+              <p>{source.claim}</p>
+              <small>{source.evidence}</small>
+            </div>
           ))}
-        </ul>
-      </div>
-      <div>
-        <h4>Source claims</h4>
-        <p className="muted">
-          Claims from research; benefits have not been measured in this project
-          unless supported by an experiment.
-        </p>
-        {item.proposal.sources.map((source, index) => (
-          <div key={`${source.documentId}:${index}`}>
-            <SourceLink
-              projectId={item.projectId}
-              documentId={source.documentId}
-              sourceVersion={source.sourceVersion}
-            />
-            <p>{source.claim}</p>
-            <small>{source.evidence}</small>
-          </div>
-        ))}
-      </div>
+        </div>
+      </details>
       <label>
-        Triage reason
+        Decision note
         <textarea
           maxLength={2000}
           value={reason}
@@ -151,7 +157,7 @@ function RecommendationCard({
         />
       </label>
       <div className="form-actions">
-        {(['saved', 'dismissed', 'tested', 'new'] as const).map((state) => (
+        {(['saved', 'dismissed', 'new'] as const).map((state) => (
           <button
             className="button"
             disabled={triage.isPending}

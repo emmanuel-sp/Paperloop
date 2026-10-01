@@ -3,17 +3,22 @@
   "private": true,
   "packageManager": "pnpm@10.18.3",
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=24.15 <25"
   },
   "scripts": {
     "dev": "pnpm --filter @paperloop/contracts build && pnpm --parallel --filter @paperloop/contracts --filter @paperloop/server --filter @paperloop/web dev",
     "build": "pnpm --filter @paperloop/contracts build && pnpm --filter @paperloop/server build && pnpm --filter @paperloop/web build",
     "typecheck": "pnpm --filter @paperloop/contracts build && pnpm --filter @paperloop/contracts --filter @paperloop/server --filter @paperloop/web typecheck",
     "lint": "eslint .",
-    "test": "pnpm --filter @paperloop/contracts build && pnpm --filter @paperloop/contracts --filter @paperloop/server test"
+    "test": "pnpm --filter @paperloop/contracts build && pnpm --filter @paperloop/contracts --filter @paperloop/server test",
+    "start": "pnpm --filter @paperloop/server start",
+    "doctor": "node apps/server/dist/index.js doctor",
+    "release": "pnpm build && node scripts/release/package.mjs",
+    "test:browser": "playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^24.8.1",
     "eslint": "^10.11.0",
     "typescript": "^5.9.3",

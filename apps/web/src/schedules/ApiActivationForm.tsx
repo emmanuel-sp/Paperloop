@@ -21,12 +21,6 @@ export function ApiActivationForm({
         onSave({ provider, model, enabled });
       }}
     >
-      <h3>API analysis activation</h3>
-      <p>
-        Set keys in the service environment. Keys alone start no paid work.
-        Enabling permits explicitly selected manual and scheduled analysis;
-        implementation still waits for an agent.
-      </p>
       {activations.map((value) => (
         <p key={value.provider}>
           {value.provider}: {value.enabled ? 'Enabled' : 'Disabled'} ·{' '}
@@ -50,7 +44,7 @@ export function ApiActivationForm({
         </select>
       </label>
       <label>
-        Configured model
+        Model identifier
         <input
           required
           maxLength={200}
@@ -58,7 +52,7 @@ export function ApiActivationForm({
           onChange={(e) => setModel(e.target.value)}
         />
       </label>
-      <label>
+      <label className="checkbox-label">
         <input
           type="checkbox"
           checked={enabled}
@@ -67,7 +61,7 @@ export function ApiActivationForm({
         Enable paid analysis for this provider and project
       </label>
       <button className="button" disabled={pending}>
-        Save activation
+        Save API settings
       </button>
     </form>
   );

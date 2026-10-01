@@ -43,7 +43,7 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
     <section className="detail-panel research-stack">
       <div>
         <p className="eyebrow">Discovery</p>
-        <h2>Search selected research sources</h2>
+        <h2>Find research</h2>
         <p className="muted">
           {sources.data?.sources.length ?? 0} sources selected.{' '}
           <Link to={`/projects/${projectId}/sources`}>Manage sources</Link>
@@ -123,35 +123,40 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
           when available.
         </p>
       )}
-      <form
-        className="research-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          fetch.mutate();
-        }}
-      >
-        <label>
-          Fetch a paper or article URL
-          <input
-            required
-            type="url"
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-          />
-        </label>
-        <button className="button" disabled={fetch.isPending} type="submit">
-          {fetch.isPending ? 'Extracting…' : 'Fetch and extract'}
-        </button>
-        {fetch.isError ? <p role="alert">{errorMessage(fetch.error)}</p> : null}
-        {fetch.data ? (
-          <p role="status">
-            {fetch.data.title} · {fetch.data.extractionStatus}
-            {fetch.data.extractionError
-              ? `: ${fetch.data.extractionError}`
-              : ''}
-          </p>
-        ) : null}
-      </form>
+      <details>
+        <summary>Add an article by URL</summary>
+        <form
+          className="research-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            fetch.mutate();
+          }}
+        >
+          <label>
+            Fetch a paper or article URL
+            <input
+              required
+              type="url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+            />
+          </label>
+          <button className="button" disabled={fetch.isPending} type="submit">
+            {fetch.isPending ? 'Extracting…' : 'Fetch and extract'}
+          </button>
+          {fetch.isError ? (
+            <p role="alert">{errorMessage(fetch.error)}</p>
+          ) : null}
+          {fetch.data ? (
+            <p role="status">
+              {fetch.data.title} · {fetch.data.extractionStatus}
+              {fetch.data.extractionError
+                ? `: ${fetch.data.extractionError}`
+                : ''}
+            </p>
+          ) : null}
+        </form>
+      </details>
     </section>
   );
 }

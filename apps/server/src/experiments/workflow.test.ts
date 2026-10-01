@@ -49,7 +49,7 @@ const draft = (script = 'evaluate.py', timeoutMs = 2000) =>
       },
     ],
     command: {
-      executable: '/usr/bin/python3',
+      executable: 'python3',
       arguments: [script],
       resultPath: 'result.json',
       timeoutMs,

@@ -12,6 +12,7 @@ import {
 import { AppShell } from '../components/AppShell';
 import { AsyncState } from '../components/AsyncState';
 import { ProjectForm } from '../projects/ProjectForm';
+import { projectSections } from '../projects/navigation';
 import { ProjectWorkspace } from '../projects/ProjectWorkspace';
 
 const projectQueryKey = ['projects'] as const;
@@ -20,18 +21,25 @@ export function App() {
   const projectsQuery = useQuery({
     queryKey: projectQueryKey,
     queryFn: listProjects,
-    retry: (count, error) => !(error instanceof ApiError && error.status === 401) && count < 2,
+    retry: (count, error) =>
+      !(error instanceof ApiError && error.status === 401) && count < 2,
   });
 
   if (projectsQuery.isPending) {
     return (
       <AppShell projects={[]}>
-        <AsyncState title="Opening your workspace" description="Connecting to the local Paperloop service…" />
+        <AsyncState
+          title="Opening your workspace"
+          description="Connecting to the local Paperloop service…"
+        />
       </AppShell>
     );
   }
 
-  if (projectsQuery.error instanceof ApiError && projectsQuery.error.status === 401) {
+  if (
+    projectsQuery.error instanceof ApiError &&
+    projectsQuery.error.status === 401
+  ) {
     return <ConnectionScreen />;
   }
 
@@ -42,7 +50,10 @@ export function App() {
           eyebrow="Connection problem"
           title="The local service is unavailable"
           description={messageFromError(projectsQuery.error)}
-          action={{ label: 'Try again', onClick: () => void projectsQuery.refetch() }}
+          action={{
+            label: 'Try again',
+            onClick: () => void projectsQuery.refetch(),
+          }}
         />
       </AppShell>
     );
@@ -64,9 +75,18 @@ function WorkbenchRoutes({ projects }: { projects: Project[] }) {
           )
         }
       />
-      <Route path="/projects/new" element={<NewProjectPage projects={projects} />} />
-      <Route path="/projects/:projectId" element={<ProjectPage projects={projects} />} />
-      <Route path="/projects/:projectId/:tab" element={<ProjectPage projects={projects} />} />
+      <Route
+        path="/projects/new"
+        element={<NewProjectPage projects={projects} />}
+      />
+      <Route
+        path="/projects/:projectId"
+        element={<ProjectPage projects={projects} />}
+      />
+      <Route
+        path="/projects/:projectId/:tab"
+        element={<ProjectPage projects={projects} />}
+      />
       <Route path="*" element={<Navigate replace to="/" />} />
     </Routes>
   );
@@ -80,7 +100,10 @@ function EmptyWorkspace({ projects }: { projects: Project[] }) {
         eyebrow="Start here"
         title="Create your first project"
         description="Describe what you are building and what better looks like. Repository context is optional during setup."
-        action={{ label: 'Create project', onClick: () => navigate('/projects/new') }}
+        action={{
+          label: 'Create project',
+          onClick: () => navigate('/projects/new'),
+        }}
       />
     </AppShell>
   );
@@ -119,7 +142,10 @@ function ProjectPage({ projects }: { projects: Project[] }) {
   if (projectQuery.isPending) {
     return (
       <AppShell projects={projects} activeProjectId={projectId} activeTab={tab}>
-        <AsyncState title="Loading project" description="Retrieving the latest project context…" />
+        <AsyncState
+          title="Loading project"
+          description="Retrieving the latest project context…"
+        />
       </AppShell>
     );
   }
@@ -131,11 +157,17 @@ function ProjectPage({ projects }: { projects: Project[] }) {
           eyebrow="Project unavailable"
           title="We could not open this project"
           description={messageFromError(projectQuery.error)}
-          action={{ label: 'Try again', onClick: () => void projectQuery.refetch() }}
+          action={{
+            label: 'Try again',
+            onClick: () => void projectQuery.refetch(),
+          }}
         />
       </AppShell>
     );
   }
+
+  if (!projectSections.some((section) => section.slug === tab))
+    return <Navigate replace to={`/projects/${projectId}/overview`} />;
 
   return (
     <AppShell projects={projects} activeProjectId={projectId} activeTab={tab}>
@@ -163,10 +195,16 @@ function ConnectionScreen() {
   return (
     <main className="connection-page">
       <section className="connection-card">
-        <span className="brand-mark large" aria-hidden="true">P</span>
+        <span className="brand-mark large" aria-hidden="true">
+          P
+        </span>
         <p className="eyebrow">Local connection</p>
-        <h1>Connect this browser to Paperloop</h1>
-        <p>The service printed the connection-secret file path at startup. Its value stays on this machine and is exchanged for a private browser session.</p>
+        <h1>Welcome to Paperloop</h1>
+        <p>
+          Connect to your local workspace to explore research and measure what
+          works. Paste the connection secret from the file shown when Paperloop
+          starts.
+        </p>
         <form onSubmit={submit}>
           <label>
             Connection secret
@@ -179,9 +217,17 @@ function ConnectionScreen() {
               value={secret}
             />
           </label>
-          {mutation.isError ? <p className="form-error" role="alert">{messageFromError(mutation.error)}</p> : null}
-          <button className="button primary" disabled={mutation.isPending} type="submit">
-            {mutation.isPending ? 'Connecting…' : 'Connect workspace'}
+          {mutation.isError ? (
+            <p className="form-error" role="alert">
+              {messageFromError(mutation.error)}
+            </p>
+          ) : null}
+          <button
+            className="button primary"
+            disabled={mutation.isPending}
+            type="submit"
+          >
+            {mutation.isPending ? 'Connecting…' : 'Open workspace'}
           </button>
         </form>
       </section>
@@ -190,5 +236,7 @@ function ConnectionScreen() {
 }
 
 function messageFromError(error: unknown): string {
-  return error instanceof Error ? error.message : 'An unexpected error occurred.';
+  return error instanceof Error
+    ? error.message
+    : 'An unexpected error occurred.';
 }

@@ -39,9 +39,22 @@ export async function request(
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => undefined)) as
-      { code?: string; message?: string } | undefined;
+      | {
+          code?: string;
+          message?: string;
+          details?: Array<{ path: unknown[]; message: string }>;
+        }
+      | undefined;
     throw new ApiError(
-      payload?.message ?? `Paperloop request failed (${response.status}).`,
+      payload?.code === 'INVALID_REQUEST' && payload.details?.length
+        ? payload.details
+            .map(
+              (issue) =>
+                `${issue.path.join(' › ') || 'Input'}: ${issue.message}`,
+            )
+            .join('. ')
+        : (payload?.message ??
+            `Paperloop request failed (${response.status}).`),
       response.status,
       payload?.code,
     );

@@ -119,7 +119,7 @@ export function AutomationRuleForm({
           onChange={(e) => setMaxRuns(Number(e.target.value))}
         />
       </label>
-      <label>
+      <label className="checkbox-label">
         <input
           type="checkbox"
           checked={automationEnabled}

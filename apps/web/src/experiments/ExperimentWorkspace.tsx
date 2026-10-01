@@ -6,15 +6,24 @@ import {
   artifactContentSchema,
   experimentDetailSchema,
 } from '@paperloop/contracts';
+import { useSearchParams } from 'react-router';
+import { WorkflowStatus, formatDate } from '../components/WorkflowStatus';
 import { listResearchDocuments, request } from '../api/client';
 
 export function ExperimentWorkspace({ projectId }: { projectId: string }) {
   const client = useQueryClient();
-  const [selected, setSelected] = useState('');
+  const [params, setParams] = useSearchParams();
+  const selected = params.get('experiment') ?? '';
+  const setSelected = (id: string) => {
+    setArtifact(undefined);
+    setParams({ experiment: id });
+  };
   const [paperId, setPaperId] = useState('');
   const [planId, setPlanId] = useState('');
   const [copy, setCopy] = useState('');
   const [reconciliation, setReconciliation] = useState('');
+  const [baselineChoice, setBaselineChoice] = useState('');
+  const [candidateChoice, setCandidateChoice] = useState('');
   const [artifact, setArtifact] = useState<{ run: string; name: string }>();
   const papers = useQuery({
     queryKey: ['research-options', projectId],
@@ -83,19 +92,35 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
       },
     });
   }
-  const baseline = detail.data?.runs
-    .filter((run) => run.role === 'baseline' && run.status === 'completed')
-    .at(-1);
-  const candidate = detail.data?.runs
-    .filter((run) => run.role === 'candidate' && run.status === 'completed')
-    .at(-1);
+  const baseline =
+    detail.data?.runs.find(
+      (run) =>
+        run.id === baselineChoice &&
+        run.role === 'baseline' &&
+        run.status === 'completed',
+    ) ??
+    detail.data?.runs
+      .filter((run) => run.role === 'baseline' && run.status === 'completed')
+      .at(-1);
+  const candidate =
+    detail.data?.runs.find(
+      (run) =>
+        run.id === candidateChoice &&
+        run.role === 'candidate' &&
+        run.status === 'completed',
+    ) ??
+    detail.data?.runs
+      .filter((run) => run.role === 'candidate' && run.status === 'completed')
+      .at(-1);
   const loadError = papers.error ?? plans.error ?? experiments.error;
   return (
     <div className="overview-grid experiment-layout">
       <div className="overview-stack">
-        <section className="detail-panel">
-          <p className="eyebrow">New experiment</p>
-          <h2>Apply a supplied paper</h2>
+        <details className="detail-panel create-panel">
+          <summary>New experiment</summary>
+          <p className="muted">
+            Test a paper in an isolated copy of your project.
+          </p>
           <form className="research-form" onSubmit={create}>
             <label>
               Paper
@@ -137,16 +162,27 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
               Prepare experiment
             </button>
           </form>
-        </section>
+        </details>
         <section className="detail-panel">
           <h2>Experiments</h2>
+          {experiments.isPending ? (
+            <p role="status">Loading experiments…</p>
+          ) : null}
+          {experiments.data?.length === 0 ? (
+            <p className="muted">
+              Your experiments will appear here. Approve an evaluation plan and
+              add a paper to begin.
+            </p>
+          ) : null}
           {experiments.data?.map((item) => (
             <button
               key={item.id}
               className="research-item"
+              aria-pressed={item.id === id}
               onClick={() => setSelected(item.id)}
             >
-              {item.status} · {item.createdAt}
+              <WorkflowStatus value={item.status} />
+              <small>{formatDate(item.createdAt)}</small>
               <small>{item.progress}</small>
             </button>
           ))}
@@ -168,32 +204,87 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
         {detail.data ? (
           <>
             <section className="detail-panel">
-              <p className="eyebrow">{detail.data.experiment.status}</p>
+              <WorkflowStatus value={detail.data.experiment.status} />
               <h2>{detail.data.plan.configuration.name}</h2>
               <p>{detail.data.experiment.progress}</p>
-              <p>Baseline: {detail.data.experiment.baselinePath}</p>
-              <p>Candidate: {detail.data.experiment.candidatePath}</p>
-              <p>Source revision: {detail.data.experiment.baselineRevision}</p>
-              <p>
-                Context: {detail.data.experiment.contextId} · Brief:{' '}
-                {detail.data.experiment.briefId ?? 'Pending'}
-              </p>
-              <ol>
-                {detail.data.nextActions.map((action) => (
-                  <li key={action}>{action}</li>
-                ))}
-              </ol>
+              <details>
+                <summary>Workspaces & provenance</summary>
+                <p>Baseline: {detail.data.experiment.baselinePath}</p>
+                <p>Candidate: {detail.data.experiment.candidatePath}</p>
+                <p>
+                  Source revision: {detail.data.experiment.baselineRevision}
+                </p>
+                <p>
+                  Context: {detail.data.experiment.contextId} · Brief:{' '}
+                  {detail.data.experiment.briefId ?? 'Pending'}
+                </p>
+              </details>
+              <div className="workflow-notice">
+                <strong>Next actions</strong>
+                <ol>
+                  {detail.data.nextActions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ol>
+              </div>
               {detail.data.experiment.status === 'pending' ? (
                 <p className="muted">
-                  Ask your connected coding agent to claim this experiment through
-                  MCP and implement the paper in the candidate workspace.
+                  Ask your connected coding agent to claim this experiment
+                  through MCP and implement the paper in the candidate
+                  workspace.
                 </p>
               ) : null}
-              <code>{detail.data.experiment.id}</code>
+
+              {baseline && candidate ? (
+                <div className="form-columns comparison-selectors">
+                  <label>
+                    Baseline run
+                    <select
+                      value={baseline.id}
+                      onChange={(e) => setBaselineChoice(e.target.value)}
+                    >
+                      {detail.data.runs
+                        .filter(
+                          (run) =>
+                            run.role === 'baseline' &&
+                            run.status === 'completed',
+                        )
+                        .map((run) => (
+                          <option key={run.id} value={run.id}>
+                            {formatDate(run.startedAt)} · {run.producer}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    Candidate run
+                    <select
+                      value={candidate.id}
+                      onChange={(e) => setCandidateChoice(e.target.value)}
+                    >
+                      {detail.data.runs
+                        .filter(
+                          (run) =>
+                            run.role === 'candidate' &&
+                            run.status === 'completed',
+                        )
+                        .map((run) => (
+                          <option key={run.id} value={run.id}>
+                            {formatDate(run.startedAt)} · {run.producer}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
               <div className="segmented-control">
                 <button
                   className="button secondary"
-                  disabled={mutation.isPending}
+                  disabled={
+                    mutation.isPending ||
+                    detail.data.experiment.status === 'interrupted' ||
+                    detail.data.runs.some((run) => run.status === 'running')
+                  }
                   onClick={() =>
                     mutation.mutate({
                       path: `/api/v1/experiments/${id}/runs`,
@@ -207,6 +298,7 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
                   className="button secondary"
                   disabled={
                     mutation.isPending ||
+                    detail.data.runs.some((run) => run.status === 'running') ||
                     !['ready', 'completed'].includes(
                       detail.data.experiment.status,
                     )
@@ -261,97 +353,114 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
                 </form>
               ) : null}
             </section>
-            {detail.data.runs.map((run) => (
-              <section className="detail-panel" key={run.id}>
-                <h2>
-                  {run.role} · {run.status}
-                </h2>
-                <p>
-                  Producer: {run.producer} ({run.producerIdentity})
-                </p>
-                <p>Code: {run.codeIdentity}</p>
-                <p>
-                  Dataset: {run.datasetIdentity} · Environment:{' '}
-                  {run.environmentIdentity}
-                </p>
-                <p>Plan fingerprint: {run.planFingerprint}</p>
-                {run.error ? <p className="form-error">{run.error}</p> : null}
-                {run.result?.metrics.map((metric) => (
-                  <p key={metric.name}>
-                    {metric.name}: {metric.value} {metric.unit}
-                  </p>
-                ))}
-                {run.status === 'running' ? (
-                  <button
-                    className="button secondary"
-                    onClick={() =>
-                      mutation.mutate({
-                        path: `/api/v1/runs/${run.id}/cancel`,
-                        body: {},
-                      })
-                    }
-                  >
-                    Request cancellation
-                  </button>
-                ) : null}
-                {run.artifactReferences.map((name) => (
-                  <button
-                    key={name}
-                    className="button secondary"
-                    onClick={() => setArtifact({ run: run.id, name })}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </section>
-            ))}
             {detail.data.comparisons.map((comparison) => (
               <section className="detail-panel" key={comparison.id}>
                 <p className="eyebrow">Comparison</p>
-                <h2>{comparison.outcome.replaceAll('_', ' ')}</h2>
+                <h2>
+                  <WorkflowStatus value={comparison.outcome} />
+                </h2>
                 {comparison.reasons.map((reason) => (
                   <p key={reason}>{reason}</p>
                 ))}
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Metric</th>
-                      <th>Baseline</th>
-                      <th>Candidate</th>
-                      <th>Change</th>
-                      <th>Guardrail</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {comparison.metrics.map((metric) => (
-                      <tr key={metric.name}>
-                        <td>
-                          {metric.name} ({metric.unit})
-                        </td>
-                        <td>{metric.baseline ?? 'Missing'}</td>
-                        <td>{metric.candidate ?? 'Missing'}</td>
-                        <td>
-                          {metric.delta ?? 'Unknown'} (
-                          {metric.percentChange?.toFixed(2) ?? 'Undefined'}%)
-                        </td>
-                        <td>
-                          {metric.guardrail
-                            ? metric.passed
-                              ? 'Passed'
-                              : 'Failed'
-                            : '—'}
-                        </td>
+                <div className="table-scroll">
+                  <table>
+                    <caption className="muted">
+                      Measured results under this evaluation plan
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        <th>Baseline</th>
+                        <th>Candidate</th>
+                        <th>Change</th>
+                        <th>Guardrail</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <small>
-                  Baseline run: {comparison.baselineRunId}
-                  <br />
-                  Candidate run: {comparison.candidateRunId}
-                </small>
+                    </thead>
+                    <tbody>
+                      {comparison.metrics.map((metric) => (
+                        <tr key={metric.name}>
+                          <td>
+                            {metric.name} ({metric.unit})
+                          </td>
+                          <td>{metric.baseline ?? 'Missing'}</td>
+                          <td>{metric.candidate ?? 'Missing'}</td>
+                          <td>
+                            {metric.delta ?? 'Unknown'} (
+                            {metric.percentChange?.toFixed(2) ?? 'Undefined'}%)
+                          </td>
+                          <td>
+                            {metric.guardrail
+                              ? metric.passed
+                                ? 'Passed'
+                                : 'Failed'
+                              : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <details>
+                  <summary>Compared run identities</summary>
+                  <small>
+                    Baseline run: {comparison.baselineRunId}
+                    <br />
+                    Candidate run: {comparison.candidateRunId}
+                  </small>
+                </details>
               </section>
             ))}
+            <div className="run-grid">
+              {' '}
+              {detail.data.runs.map((run) => (
+                <section className="detail-panel" key={run.id}>
+                  <h2>{run.role === 'baseline' ? 'Baseline' : 'Candidate'}</h2>
+                  <WorkflowStatus value={run.status} />
+                  <details>
+                    <summary>Run provenance</summary>
+                    <p>
+                      Producer: {run.producer} ({run.producerIdentity})
+                    </p>
+                    <p>Code: {run.codeIdentity}</p>
+                    <p>
+                      Dataset: {run.datasetIdentity} · Environment:{' '}
+                      {run.environmentIdentity}
+                    </p>
+                    <p>Plan fingerprint: {run.planFingerprint}</p>
+                  </details>
+                  {run.error ? <p className="form-error">{run.error}</p> : null}
+                  {run.result?.metrics.map((metric) => (
+                    <p key={metric.name}>
+                      {metric.name}: {metric.value} {metric.unit}
+                    </p>
+                  ))}
+                  {run.status === 'running' ? (
+                    <button
+                      className="button secondary"
+                      onClick={() =>
+                        mutation.mutate({
+                          path: `/api/v1/runs/${run.id}/cancel`,
+                          body: {},
+                        })
+                      }
+                    >
+                      Request cancellation
+                    </button>
+                  ) : null}
+                  <div className="form-actions">
+                    {run.artifactReferences.map((name) => (
+                      <button
+                        key={name}
+                        className="button secondary"
+                        onClick={() => setArtifact({ run: run.id, name })}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
           </>
         ) : (
           <section className="detail-panel">

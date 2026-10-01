@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useRef, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   evaluationPlanDraftSchema,
@@ -30,25 +30,44 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
   );
   const [improvement, setImprovement] = useState('1');
   const [regression, setRegression] = useState('0');
-  const [guardrails, setGuardrails] = useState('');
+  const [guardrails, setGuardrails] = useState<
+    Array<{
+      name: string;
+      unit: string;
+      direction: 'increase' | 'decrease';
+      maximumRegression: number;
+    }>
+  >([]);
   const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const createPanel = useRef<HTMLDetailsElement>(null);
   const mutation = useMutation({
     mutationFn: async (operation: { path: string; body: unknown }) =>
       request(operation.path, {
         method: 'POST',
         body: JSON.stringify(operation.body),
       }),
-    onSuccess: async () => {
+    onSuccess: async (_result, operation) => {
       await client.invalidateQueries({ queryKey });
       setError('');
+      setFeedback(
+        operation.path.endsWith('/approve')
+          ? 'Plan approved. You can use it in an experiment.'
+          : 'Plan saved. Review and approve this version below.',
+      );
+      if (!operation.path.endsWith('/approve') && createPanel.current)
+        createPanel.current.open = false;
     },
   });
   function submit(event: FormEvent) {
     event.preventDefault();
     try {
-      const extra = guardrails.trim()
-        ? (JSON.parse(guardrails) as unknown[])
-        : [];
+      const extra = guardrails.map((item) => ({
+        ...item,
+        guardrail: true,
+        minimumImprovement: 0,
+        minimumSamples: 1,
+      }));
       const plan = evaluationPlanDraftSchema.parse({
         name,
         datasetIdentity: dataset,
@@ -86,10 +105,13 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
     }
   }
   return (
-    <div className="overview-grid">
-      <section className="detail-panel">
-        <p className="eyebrow">Evaluation plan</p>
-        <h2>Define what improvement means</h2>
+    <div className="research-stack">
+      <details ref={createPanel} className="detail-panel create-panel">
+        <summary>Create an evaluation plan</summary>
+        <p className="muted">
+          Choose a metric, dataset, and command. Each version needs your
+          approval before it can run.
+        </p>
         <form className="research-form" onSubmit={submit}>
           <label>
             Name
@@ -165,16 +187,123 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
               />
             </label>
           </div>
-          <label>
-            Additional metrics and guardrails (JSON array)
-            <textarea
-              value={guardrails}
-              onChange={(e) => setGuardrails(e.target.value)}
-              placeholder={
-                '[{"name":"quality","unit":"score","direction":"increase","minimumImprovement":0,"maximumRegression":0,"guardrail":true}]'
+          <details>
+            <summary>Guardrail metrics</summary>
+            <p className="muted">
+              Set limits for metrics that must not regress.
+            </p>
+            {guardrails.map((item, index) => (
+              <fieldset key={index}>
+                <legend>Guardrail {index + 1}</legend>
+                <div className="form-columns">
+                  <label>
+                    Metric name
+                    <input
+                      required
+                      value={item.name}
+                      onChange={(e) =>
+                        setGuardrails(
+                          guardrails.map((value, i) =>
+                            i === index
+                              ? { ...value, name: e.target.value }
+                              : value,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                  <label>
+                    Unit
+                    <input
+                      required
+                      value={item.unit}
+                      onChange={(e) =>
+                        setGuardrails(
+                          guardrails.map((value, i) =>
+                            i === index
+                              ? { ...value, unit: e.target.value }
+                              : value,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="form-columns">
+                  <label>
+                    Direction
+                    <select
+                      value={item.direction}
+                      onChange={(e) =>
+                        setGuardrails(
+                          guardrails.map((value, i) =>
+                            i === index
+                              ? {
+                                  ...value,
+                                  direction: e.target.value as
+                                    'increase' | 'decrease',
+                                }
+                              : value,
+                          ),
+                        )
+                      }
+                    >
+                      <option value="increase">Higher is better</option>
+                      <option value="decrease">Lower is better</option>
+                    </select>
+                  </label>
+                  <label>
+                    Maximum regression
+                    <input
+                      required
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={item.maximumRegression}
+                      onChange={(e) =>
+                        setGuardrails(
+                          guardrails.map((value, i) =>
+                            i === index
+                              ? {
+                                  ...value,
+                                  maximumRegression: Number(e.target.value),
+                                }
+                              : value,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() =>
+                    setGuardrails(guardrails.filter((_, i) => i !== index))
+                  }
+                >
+                  Remove guardrail {index + 1}
+                </button>
+              </fieldset>
+            ))}
+            <button
+              type="button"
+              className="button"
+              onClick={() =>
+                setGuardrails([
+                  ...guardrails,
+                  {
+                    name: '',
+                    unit: '',
+                    direction: 'increase',
+                    maximumRegression: 0,
+                  },
+                ])
               }
-            />
-          </label>
+            >
+              Add guardrail
+            </button>
+          </details>
           <label>
             Executable
             <input
@@ -212,10 +341,25 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
             Save new plan version
           </button>
         </form>
-      </section>
+      </details>
+      {feedback ? (
+        <p role="status" className="workflow-notice">
+          {feedback}
+        </p>
+      ) : null}
+      {mutation.error ? <p role="alert">{mutation.error.message}</p> : null}
       <div className="overview-stack">
         {query.isPending ? <p>Loading plans…</p> : null}
         {query.error ? <p role="alert">{query.error.message}</p> : null}
+        {query.data?.length === 0 ? (
+          <section className="detail-panel empty-inline">
+            <h2>No evaluation plans yet</h2>
+            <p>
+              Define a plan above, or ask your coding agent to draft one. You
+              review the command and approve each version here.
+            </p>
+          </section>
+        ) : null}
         {query.data?.map((plan) => (
           <section key={plan.id} className="detail-panel">
             <p className="eyebrow">
@@ -223,39 +367,59 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
               {plan.approvedAt ? 'Approved' : 'Approval required'}
             </p>
             <h2>{plan.configuration.name}</h2>
-            <p>Dataset: {plan.configuration.datasetIdentity}</p>
-            <p>Environment: {plan.configuration.environmentIdentity}</p>
+            <dl className="provenance-list">
+              <div>
+                <dt>Dataset</dt>
+                <dd>{plan.configuration.datasetIdentity}</dd>
+              </div>
+              <div>
+                <dt>Environment</dt>
+                <dd>{plan.configuration.environmentIdentity}</dd>
+              </div>
+            </dl>
             <p>
-              Command: {plan.configuration.command.executable}{' '}
-              {plan.configuration.command.arguments.join(' ')}
+              <strong>Command</strong>{' '}
+              <code>
+                {plan.configuration.command.executable}{' '}
+                {plan.configuration.command.arguments.join(' ')}
+              </code>
             </p>
-            <p>
-              Timeout: {plan.configuration.command.timeoutMs / 1000}s · Working
-              directory: {plan.configuration.command.workingDirectory} · Result:{' '}
-              {plan.configuration.command.resultPath}
-            </p>
-            <p>
-              Environment references:{' '}
-              {plan.configuration.command.environmentReferences.join(', ') ||
-                'None'}
-            </p>
-            <ul>
-              {plan.configuration.cases.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-            <ul>
-              {plan.configuration.metrics.map((item) => (
-                <li key={item.name}>
-                  {item.name}: {item.direction}, improvement ≥{' '}
-                  {item.minimumImprovement} {item.unit}, regression ≤{' '}
-                  {item.maximumRegression} {item.unit}, samples ≥{' '}
-                  {item.minimumSamples}
-                  {item.guardrail ? ' (guardrail)' : ''}
-                </li>
-              ))}
-            </ul>
-            <p className="muted">
+            <details>
+              <summary>Cases & metric thresholds</summary>
+              <p>Dataset: {plan.configuration.datasetIdentity}</p>
+              <p>Environment: {plan.configuration.environmentIdentity}</p>
+              <p>
+                Command: {plan.configuration.command.executable}{' '}
+                {plan.configuration.command.arguments.join(' ')}
+              </p>
+              <p>
+                Timeout: {plan.configuration.command.timeoutMs / 1000}s ·
+                Working directory: {plan.configuration.command.workingDirectory}{' '}
+                · Result: {plan.configuration.command.resultPath}
+              </p>
+              <p>
+                Environment references:{' '}
+                {plan.configuration.command.environmentReferences.join(', ') ||
+                  'None'}
+              </p>
+              <ul>
+                {plan.configuration.cases.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <ul>
+                {plan.configuration.metrics.map((item) => (
+                  <li key={item.name}>
+                    {item.name}: {item.direction}, improvement ≥{' '}
+                    {item.minimumImprovement} {item.unit}, regression ≤{' '}
+                    {item.maximumRegression} {item.unit}, samples ≥{' '}
+                    {item.minimumSamples}
+                    {item.guardrail ? ' (guardrail)' : ''}
+                  </li>
+                ))}
+              </ul>
+            </details>
+            <p className="workflow-notice">
               Evaluations run with your local permissions. Review the command
               and inputs before approving this version.
             </p>

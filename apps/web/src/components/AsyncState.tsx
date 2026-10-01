@@ -17,7 +17,11 @@ export function AsyncState({
       <h2>{title}</h2>
       <p>{description}</p>
       {action ? (
-        <button className="button secondary" type="button" onClick={action.onClick}>
+        <button
+          className="button secondary"
+          type="button"
+          onClick={action.onClick}
+        >
           {action.label}
         </button>
       ) : null}

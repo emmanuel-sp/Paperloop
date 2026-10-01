@@ -45,7 +45,7 @@ export function loadConfiguration(
       ? defaultWebRoot
       : undefined;
 
-  if (webRoot && !statSync(webRoot).isDirectory()) {
+  if (webRoot && (!existsSync(webRoot) || !statSync(webRoot).isDirectory())) {
     throw new Error('PAPERLOOP_WEB_ROOT must reference a directory.');
   }
 
