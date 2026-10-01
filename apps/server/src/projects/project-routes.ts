@@ -9,6 +9,7 @@ import {
 } from '@paperloop/contracts';
 import type { FastifyInstance } from 'fastify';
 import { ProjectService } from './project-service.js';
+import { GithubService } from './github-service.js';
 
 interface ProjectParameters {
   id: string;
@@ -17,13 +18,26 @@ interface ProjectParameters {
 export function registerProjectRoutes(
   app: FastifyInstance,
   service: ProjectService,
+  github: GithubService,
 ): void {
   app.get('/api/v1/projects', async () =>
     projectListResponseSchema.parse({ projects: service.list() }),
   );
 
   app.post('/api/v1/projects', async (request, reply) => {
-    const project = service.create(createProjectRequestSchema.parse(request.body));
+    const input = createProjectRequestSchema.parse(request.body);
+    if (input.repository?.kind === 'github') {
+      const selected = await github.resolve(
+        input.repository.owner,
+        input.repository.repository,
+      );
+      input.repository = {
+        kind: 'github',
+        owner: selected.owner,
+        repository: selected.repository,
+      };
+    }
+    const project = service.create(input);
     return reply.code(201).send(projectSchema.parse(project));
   });
 
@@ -45,13 +59,24 @@ export function registerProjectRoutes(
 
   app.put<{ Params: ProjectParameters }>(
     '/api/v1/projects/:id/repository',
-    async (request) =>
-      projectSchema.parse(
-        service.registerRepository(
-          request.params.id,
-          projectRepositorySchema.parse(request.body),
-        ),
-      ),
+    async (request) => {
+      service.get(request.params.id);
+      let repository = projectRepositorySchema.parse(request.body);
+      if (repository.kind === 'github') {
+        const selected = await github.resolve(
+          repository.owner,
+          repository.repository,
+        );
+        repository = {
+          kind: 'github',
+          owner: selected.owner,
+          repository: selected.repository,
+        };
+      }
+      return projectSchema.parse(
+        service.registerRepository(request.params.id, repository),
+      );
+    },
   );
 
   app.get<{ Params: ProjectParameters }>(

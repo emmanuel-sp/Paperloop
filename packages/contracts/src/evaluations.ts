@@ -88,6 +88,7 @@ export const experimentRequestSchema = z
     planId: z.uuid(),
     baselineRevision: text.optional(),
     isolatedCopy: text.optional(),
+    checkoutPath: text.optional(),
   })
   .strict();
 export type ExperimentRequest = z.infer<typeof experimentRequestSchema>;

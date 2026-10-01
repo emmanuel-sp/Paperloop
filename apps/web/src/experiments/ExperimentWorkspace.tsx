@@ -9,12 +9,19 @@ import {
   experimentListSchema,
   artifactContentSchema,
   experimentDetailSchema,
+  type ProjectRepository,
 } from '@paperloop/contracts';
 import { Link, useSearchParams } from 'react-router';
 import { WorkflowStatus, formatDate } from '../components/WorkflowStatus';
 import { listResearchDocuments, request } from '../api/client';
 
-export function ExperimentWorkspace({ projectId }: { projectId: string }) {
+export function ExperimentWorkspace({
+  projectId,
+  repository,
+}: {
+  projectId: string;
+  repository: ProjectRepository | null;
+}) {
   const client = useQueryClient();
   const [params, setParams] = useSearchParams();
   const selected = params.get('experiment') ?? '';
@@ -30,6 +37,7 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
   const [paperId, setPaperId] = useState(params.get('paper') ?? '');
   const [planId, setPlanId] = useState('');
   const [copy, setCopy] = useState('');
+  const [checkoutPath, setCheckoutPath] = useState('');
   const [reconciliation, setReconciliation] = useState('');
   const [baselineChoice, setBaselineChoice] = useState('');
   const [candidateChoice, setCandidateChoice] = useState('');
@@ -98,6 +106,7 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
         documentId: paperId,
         planId,
         ...(copy ? { isolatedCopy: copy } : {}),
+        ...(repository?.kind === 'github' ? { checkoutPath } : {}),
       },
     });
   }
@@ -155,6 +164,24 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
             </p>
           ) : null}
           <form className="research-form" onSubmit={create}>
+            {repository?.kind === 'github' ? (
+              <label>
+                Local execution checkout
+                <input
+                  autoComplete="off"
+                  required
+                  value={checkoutPath}
+                  onChange={(event) => setCheckoutPath(event.target.value)}
+                  placeholder="/home/me/projects/my-app"
+                />
+                <span>
+                  Choose an existing committed checkout of {repository.owner}/
+                  {repository.repository} with a matching origin. This creates
+                  isolated workspaces and keeps GitHub as the project’s research
+                  context.
+                </span>
+              </label>
+            ) : null}
             <label>
               Paper
               <select
@@ -191,15 +218,17 @@ export function ExperimentWorkspace({ projectId }: { projectId: string }) {
                   ))}
               </select>
             </label>
-            <label>
-              Prepared copy path (non-Git projects)
-              <input
-                name="isolatedCopy"
-                autoComplete="off"
-                value={copy}
-                onChange={(e) => setCopy(e.target.value)}
-              />
-            </label>
+            {repository?.kind !== 'github' ? (
+              <label>
+                Prepared copy path (non-Git projects)
+                <input
+                  name="isolatedCopy"
+                  autoComplete="off"
+                  value={copy}
+                  onChange={(e) => setCopy(e.target.value)}
+                />
+              </label>
+            ) : null}
             <button
               disabled={
                 mutation.isPending ||

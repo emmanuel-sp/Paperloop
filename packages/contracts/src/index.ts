@@ -1,5 +1,7 @@
 import { z } from 'zod';
+import { githubRepositoryIdentitySchema } from './github.js';
 export * from './evaluations.js';
+export * from './github.js';
 
 export const healthResponseSchema = z.object({ status: z.literal('ok') });
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
@@ -16,8 +18,8 @@ export const projectRepositorySchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('github'),
-      owner: nonEmptyText,
-      repository: nonEmptyText,
+      owner: githubRepositoryIdentitySchema.shape.owner,
+      repository: githubRepositoryIdentitySchema.shape.repository,
     })
     .strict(),
 ]);
