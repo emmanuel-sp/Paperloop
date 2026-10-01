@@ -2,6 +2,10 @@
 
 Paperloop is a local workbench and MCP service for applying research to software projects and measuring the result. See [product scope](PRODUCT_SCOPE.md), [technical design](TECHNICAL_DESIGN.md), the [supplied-paper experiment walkthrough](docs/EXPERIMENT_LOOP.md), and [research discovery](docs/DISCOVERY.md), and [scheduling and automation](docs/SCHEDULING.md).
 
+## Run the local application
+
+Install the latest Node.js 24 (at least 24.15), then follow [installation, diagnostics, and backup/recovery](docs/INSTALL.md). From a built checkout, `pnpm start` serves the workbench at http://localhost:3000; `pnpm doctor` checks the runtime. `pnpm release` creates the installable UI/server bundle.
+
 ## Repository map
 
 ```text
@@ -21,7 +25,7 @@ Generated `dist/`, `node_modules/`, and local application data stay out of Git. 
 
 ## Development
 
-Use Node.js 24 and pnpm 10.18.3. Corepack can supply the pinned pnpm version.
+Use Node.js 24.15 or newer within Node 24 and pnpm 10.18.3. Corepack can supply the pinned pnpm version.
 
 ```bash
 corepack enable
@@ -55,4 +59,4 @@ pnpm lint
 pnpm test
 ```
 
-`pnpm build` compiles contracts first, then the server and web app. CI runs these commands with a frozen lockfile.
+`pnpm build` compiles contracts first, then the server and web app. CI runs these commands and Chromium workflows on Linux and macOS with a frozen lockfile, verifies the installed release bundle, and uploads the archive. Run `pnpm test:browser` after building for the browser regression suite.

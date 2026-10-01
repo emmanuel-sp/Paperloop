@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  ExtractionStatus,
   IngestResearchDocumentRequest,
   ResearchDocument,
   ResearchSourceKind,
@@ -15,14 +14,22 @@ import { DiscoveryPanel } from './DiscoveryPanel';
 import { LibraryPanel } from './LibraryPanel';
 import { RecommendationPanel } from './RecommendationPanel';
 import { getDocument, extractDocument, errorMessage } from './discovery-client';
+import { useSearchParams } from 'react-router';
+import { WorkflowStatus } from '../components/WorkflowStatus';
 import { AsyncState } from '../components/AsyncState';
 
 export function ResearchWorkspace({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
-  const [view, setView] = useState<'discovery' | 'library' | 'supply'>(
-    'discovery',
-  );
-  const [selectedId, setSelectedId] = useState<string>();
+  const [params, setParams] = useSearchParams();
+  const views = ['discovery', 'recommendations', 'library', 'supply'] as const;
+  const rawView = params.get('view');
+  const view = views.find((item) => item === rawView) ?? 'library';
+  const selectedId = params.get('paper') ?? undefined;
+  const setSelectedId = (id: string) =>
+    setParams((previous) => {
+      previous.set('paper', id);
+      return previous;
+    });
   const queryKey = ['projects', projectId, 'research'] as const;
   const query = useQuery({
     queryKey,
@@ -44,8 +51,7 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
   });
   const selected =
     selectedQuery.data ??
-    documents.find((document) => document.id === selectedId) ??
-    documents[0];
+    documents.find((document) => document.id === selectedId);
 
   if (query.isPending) {
     return (
@@ -69,19 +75,25 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
   return (
     <div className="research-stack">
       <nav className="research-view-nav" aria-label="Research views">
-        {(['discovery', 'library', 'supply'] as const).map((value) => (
+        {views.map((value) => (
           <button
             className="button"
             aria-pressed={view === value}
             type="button"
             key={value}
-            onClick={() => setView(value)}
+            onClick={() =>
+              setParams((previous) => {
+                previous.set('view', value);
+                return previous;
+              })
+            }
           >
             {
               {
-                discovery: 'Discovery & recommendations',
-                library: 'Local library',
-                supply: 'Supply a paper',
+                discovery: 'Discover',
+                recommendations: 'Recommendations',
+                library: 'Library',
+                supply: 'Add a paper',
               }[value]
             }
           </button>
@@ -93,13 +105,13 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
       <div className="research-layout">
         <div className="research-stack">
           {view === 'discovery' ? (
-            <>
-              <DiscoveryPanel projectId={projectId} />
-              <RecommendationPanel
-                projectId={projectId}
-                onSelect={setSelectedId}
-              />
-            </>
+            <DiscoveryPanel projectId={projectId} />
+          ) : null}
+          {view === 'recommendations' ? (
+            <RecommendationPanel
+              projectId={projectId}
+              onSelect={setSelectedId}
+            />
           ) : null}
           {view === 'library' ? (
             <LibraryPanel projectId={projectId} onSelect={setSelectedId} />
@@ -113,43 +125,12 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
               onSubmit={(input) => mutation.mutate(input)}
             />
           ) : null}
-          {view !== 'discovery' ? (
-            <section className="detail-panel">
-              <p className="eyebrow">Recent papers</p>
-              <h2>{query.data.length} recent papers</h2>
-              {query.data.length === 0 ? (
-                <p className="muted">
-                  Add a paper URL, arXiv identifier, or citation to begin the
-                  experiment flow.
-                </p>
-              ) : (
-                <div className="research-list">
-                  {query.data.map((document) => (
-                    <button
-                      className={
-                        document.id === selected?.id
-                          ? 'research-item active'
-                          : 'research-item'
-                      }
-                      key={document.id}
-                      onClick={() => setSelectedId(document.id)}
-                      type="button"
-                    >
-                      <span>{document.title}</span>
-                      <small>
-                        {document.extractionStatus} ·{' '}
-                        {document.currentBrief
-                          ? `brief v${document.currentBrief.version}`
-                          : 'brief pending'}
-                      </small>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
-          ) : null}
         </div>
-        <PaperDetail projectId={projectId} document={selected} />
+        <PaperDetail
+          key={selected?.id ?? 'empty'}
+          projectId={projectId}
+          document={selected}
+        />
       </div>
     </div>
   );
@@ -168,8 +149,6 @@ function PaperForm({
   const [sourceKind, setSourceKind] = useState<ResearchSourceKind>('url');
   const [sourceReference, setSourceReference] = useState('');
   const [extractedContent, setExtractedContent] = useState('');
-  const [extractionStatus, setExtractionStatus] =
-    useState<ExtractionStatus>('pending');
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -177,7 +156,7 @@ function PaperForm({
       title,
       sourceKind,
       sourceReference,
-      extractionStatus,
+      extractionStatus: extractedContent.trim() ? 'complete' : 'pending',
       ...(extractedContent.trim() ? { extractedContent } : {}),
       authors: [],
       submittedBy: 'user',
@@ -187,7 +166,7 @@ function PaperForm({
   return (
     <section className="detail-panel research-form-card">
       <p className="eyebrow">Add research</p>
-      <h2>Supply a paper</h2>
+      <h2>Add a paper</h2>
       <form className="research-form" onSubmit={submit}>
         <label>
           Title
@@ -211,20 +190,6 @@ function PaperForm({
               <option value="reference">Citation / reference</option>
             </select>
           </label>
-          <label>
-            Extraction status
-            <select
-              onChange={(event) =>
-                setExtractionStatus(event.target.value as ExtractionStatus)
-              }
-              value={extractionStatus}
-            >
-              <option value="pending">Pending</option>
-              <option value="partial">Partial</option>
-              <option value="complete">Complete</option>
-              <option value="unavailable">Unavailable</option>
-            </select>
-          </label>
         </div>
         <label>
           URL or reference
@@ -234,15 +199,18 @@ function PaperForm({
             value={sourceReference}
           />
         </label>
-        <label>
-          Extracted content
-          <textarea
-            onChange={(event) => setExtractedContent(event.target.value)}
-            placeholder="Paste any content already available to the agent."
-            rows={5}
-            value={extractedContent}
-          />
-        </label>
+        <details>
+          <summary>Add text manually (optional)</summary>
+          <label>
+            Paper text
+            <textarea
+              onChange={(event) => setExtractedContent(event.target.value)}
+              placeholder="Paste the paper text if it cannot be fetched from the source."
+              rows={5}
+              value={extractedContent}
+            />
+          </label>
+        </details>
         {error ? (
           <p className="form-error" role="alert">
             {error}
@@ -279,10 +247,10 @@ function PaperDetail({
     return (
       <section className="detail-panel research-detail empty-detail">
         <p className="eyebrow">Paper detail</p>
-        <h2>No paper selected</h2>
+        <h2>Select a paper to read</h2>
         <p className="muted">
-          Supply a paper to preserve its provenance and prepare an
-          implementation brief.
+          Add a paper to preserve its provenance and prepare an implementation
+          brief.
         </p>
       </section>
     );
@@ -295,33 +263,38 @@ function PaperDetail({
           <p className="eyebrow">Paper detail</p>
           <h2>{document.title}</h2>
         </div>
-        <span className={`status-pill ${document.extractionStatus}`}>
-          {document.extractionStatus}
-        </span>
+        <WorkflowStatus value={document.extractionStatus} />
       </div>
-      <dl className="provenance-list compact">
-        <div>
-          <dt>Reference</dt>
-          <dd>{document.sourceReference}</dd>
-        </div>
-        <div>
-          <dt>Version</dt>
-          <dd>{document.sourceVersion ?? 'Not specified'}</dd>
-        </div>
-        <div>
-          <dt>Submitted</dt>
-          <dd>{document.submittedBy}</dd>
-        </div>
-        <div>
-          <dt>Retrieved</dt>
-          <dd>
-            {document.retrievedAt
-              ? new Date(document.retrievedAt).toLocaleString()
-              : 'Not recorded'}
-          </dd>
-        </div>
-      </dl>
-      <div className="content-section">
+      <p className="muted">
+        {document.authors.join(', ') || 'Authors not recorded'}
+      </p>
+      <details>
+        <summary>Source & provenance</summary>
+        <dl className="provenance-list compact">
+          <div>
+            <dt>Reference</dt>
+            <dd>{document.sourceReference}</dd>
+          </div>
+          <div>
+            <dt>Version</dt>
+            <dd>{document.sourceVersion ?? 'Not specified'}</dd>
+          </div>
+          <div>
+            <dt>Submitted</dt>
+            <dd>{document.submittedBy}</dd>
+          </div>
+          <div>
+            <dt>Retrieved</dt>
+            <dd>
+              {document.retrievedAt
+                ? new Date(document.retrievedAt).toLocaleString()
+                : 'Not recorded'}
+            </dd>
+          </div>
+        </dl>
+      </details>
+      <details className="content-section">
+        <summary>Full text</summary>
         <h3>Extracted content</h3>
         <button
           className="button"
@@ -344,7 +317,7 @@ function PaperDetail({
           projectId={projectId}
           document={document}
         />
-      </div>
+      </details>
       <div className="content-section implementation-brief">
         <p className="eyebrow">Implementation brief</p>
         {document.currentBrief ? (
@@ -370,7 +343,8 @@ function PaperDetail({
           </>
         ) : (
           <p className="muted">
-            Waiting for an agent to analyze this paper for the current project.
+            Connect your coding agent and ask it to analyze this paper. The
+            brief will appear here when it is saved.
           </p>
         )}
       </div>

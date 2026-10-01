@@ -144,3 +144,7 @@ vite.config.ts.timestamp-*
 
 # Local application data
 .paperloop-data/
+
+/release/
+playwright-report/
+test-results/

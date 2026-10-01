@@ -1,19 +1,13 @@
 import { ScheduleWorkspace } from '../schedules/ScheduleWorkspace';
 import type { Project } from '@paperloop/contracts';
-import { NavLink } from 'react-router';
+import { Link } from 'react-router';
 import { SourceWorkspace } from '../research/SourceWorkspace';
 import { ResearchWorkspace } from '../research/ResearchWorkspace';
 import { EvaluationWorkspace } from '../evaluations/EvaluationWorkspace';
 import { ExperimentWorkspace } from '../experiments/ExperimentWorkspace';
 
-const tabs = [
-  ['overview', 'Overview'],
-  ['research', 'Research'],
-  ['evaluations', 'Evaluations'],
-  ['experiments', 'Experiments'],
-  ['sources', 'Sources & schedules'],
-] as const;
-
+import { projectSections } from './navigation';
+import { ProjectActivity } from './ProjectActivity';
 interface ProjectWorkspaceProps {
   activeTab: string;
   project: Project;
@@ -25,49 +19,44 @@ export function ProjectWorkspace({
 }: ProjectWorkspaceProps) {
   return (
     <>
-      <section className="project-header">
+      <header className="project-header">
         <div>
-          <p className="eyebrow">Project workspace</p>
-          <h1>{project.name}</h1>
-          <p>{project.description}</p>
+          <p className="eyebrow">{project.name}</p>
+          <h1>
+            {
+              projectSections.find((section) => section.slug === activeTab)
+                ?.label
+            }
+          </h1>
+          <p>
+            {
+              projectSections.find((section) => section.slug === activeTab)
+                ?.description
+            }
+          </p>
         </div>
         <ContextBadge project={project} />
-      </section>
-      <nav className="tabs" aria-label="Project sections">
-        {tabs.map(([slug, label]) => (
-          <NavLink key={slug} to={`/projects/${project.id}/${slug}`}>
-            {label}
-          </NavLink>
-        ))}
-      </nav>
+      </header>
       {activeTab === 'overview' ? (
-        <ProjectOverview project={project} />
+        <div className="research-stack">
+          <ProjectActivity projectId={project.id} />
+          <ProjectOverview project={project} />
+        </div>
       ) : activeTab === 'research' ? (
         <ResearchWorkspace key={project.id} projectId={project.id} />
       ) : activeTab === 'sources' ? (
-        <div className="research-stack">
-          <SourceWorkspace key={project.id} projectId={project.id} />
-          <ScheduleWorkspace
-            key={`schedule-${project.id}`}
-            projectId={project.id}
-          />
-        </div>
+        <SourceWorkspace key={project.id} projectId={project.id} />
+      ) : activeTab === 'schedules' || activeTab === 'settings' ? (
+        <ScheduleWorkspace
+          key={`${project.id}-${activeTab}`}
+          projectId={project.id}
+          view={activeTab}
+        />
       ) : activeTab === 'evaluations' ? (
         <EvaluationWorkspace key={project.id} projectId={project.id} />
       ) : activeTab === 'experiments' ? (
         <ExperimentWorkspace key={project.id} projectId={project.id} />
-      ) : (
-        <section className="detail-panel placeholder-panel">
-          <p className="eyebrow">Coming in this milestone sequence</p>
-          <h2>
-            {tabs.find(([slug]) => slug === activeTab)?.[1] ?? 'Project detail'}
-          </h2>
-          <p>
-            This workspace route is ready for its feature workflow while
-            preserving your project selection.
-          </p>
-        </section>
-      )}
+      ) : null}
     </>
   );
 }
@@ -78,7 +67,7 @@ function ContextBadge({ project }: { project: Project }) {
     <div className="context-badge">
       <span>Context v{project.currentContext.version}</span>
       <strong>{project.currentContext.sourceKind.replace('_', ' ')}</strong>
-      <small>Updated {capturedAt.toLocaleString()}</small>
+      <small>{capturedAt.toLocaleDateString()}</small>
     </div>
   );
 }
@@ -87,29 +76,38 @@ function ProjectOverview({ project }: { project: Project }) {
   return (
     <div className="overview-grid">
       <section className="detail-panel overview-main">
-        <p className="eyebrow">Current context</p>
-        <h2>What Paperloop knows</h2>
-        <p className="context-summary">{project.currentContext.summary}</p>
-        <dl className="provenance-list">
-          <div>
-            <dt>Source</dt>
-            <dd>
-              {project.currentContext.sourceReference ?? 'Project description'}
-            </dd>
-          </div>
-          <div>
-            <dt>Revision</dt>
-            <dd>
-              {project.currentContext.repositoryRevision ?? 'Not available'}
-            </dd>
-          </div>
-          <div>
-            <dt>Captured</dt>
-            <dd>
-              {new Date(project.currentContext.capturedAt).toLocaleString()}
-            </dd>
-          </div>
-        </dl>
+        <h2>Project context</h2>
+        <p className="context-summary">
+          {project.description || project.currentContext.summary}
+        </p>
+        <details>
+          <summary>Context & provenance</summary>
+          <p>{project.currentContext.summary}</p>
+          <dl className="provenance-list">
+            <div>
+              <dt>Source</dt>
+              <dd>
+                {project.currentContext.sourceReference ??
+                  'Project description'}
+              </dd>
+            </div>
+            <div>
+              <dt>Revision</dt>
+              <dd>
+                {project.currentContext.repositoryRevision ?? 'Not available'}
+              </dd>
+            </div>
+            <div>
+              <dt>Captured</dt>
+              <dd>
+                {new Date(project.currentContext.capturedAt).toLocaleString()}
+              </dd>
+            </div>
+          </dl>
+        </details>
+        <Link className="text-link" to={`/projects/${project.id}/research`}>
+          Explore research →
+        </Link>
       </section>
       <div className="overview-stack">
         <ListCard

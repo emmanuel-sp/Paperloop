@@ -27,6 +27,18 @@ afterEach(async () => {
       .map((close) => close()),
   );
 });
+// Both Linux and macOS expose process state through ps; /proc exists only on Linux.
+function expectStopped(pid: number) {
+  let state = '';
+  try {
+    state = execFileSync('ps', ['-p', String(pid), '-o', 'stat='], {
+      encoding: 'utf8',
+    }).trim();
+  } catch (error) {
+    if ((error as { status?: number }).status !== 1) throw error;
+  }
+  expect(['', 'Z', 'X']).toContain(state.slice(0, 1));
+}
 const secret = 'workflow-test-connection';
 const evaluator = `import json, pathlib
 value = float(pathlib.Path('score.txt').read_text())
@@ -49,7 +61,7 @@ const draft = (script = 'evaluate.py', timeoutMs = 2000) =>
       },
     ],
     command: {
-      executable: '/usr/bin/python3',
+      executable: 'python3',
       arguments: [script],
       resultPath: 'result.json',
       timeoutMs,
@@ -710,7 +722,7 @@ describe('real subprocess evaluation failure paths', () => {
     ).toMatchObject({ status: 'failed' });
     writeFileSync(
       join(workspace, 'evaluate.py'),
-      'import subprocess,time,pathlib; child=subprocess.Popen(["/usr/bin/python3","-c","import time; time.sleep(20)"]); pathlib.Path("child.pid").write_text(str(child.pid)); time.sleep(20)',
+      'import subprocess,time,pathlib,sys; child=subprocess.Popen([sys.executable,"-c","import time; time.sleep(20)"]); pathlib.Path("child.pid").write_text(str(child.pid)); time.sleep(20)',
     );
     const running = executePlan(
       { ...plan, configuration: draft('evaluate.py', 5000) },
@@ -731,14 +743,7 @@ describe('real subprocess evaluation failure paths', () => {
     });
     const pid = Number(readFileSync(join(workspace, 'child.pid'), 'utf8'));
     expect(pid).toBeGreaterThan(0);
-    // done now confirms no live group member; unreaped zombies are harmless.
-    let state = '';
-    try {
-      state = readFileSync(`/proc/${pid}/stat`, 'utf8').split(' ')[2]!;
-    } catch {
-      /* Reaped. */
-    }
-    expect(['', 'Z']).toContain(state);
+    expectStopped(pid);
   });
 
   it.each(['cancelled', 'timed_out'] as const)(
@@ -757,8 +762,8 @@ time.sleep(20)
       );
       writeFileSync(
         join(workspace, 'evaluate.py'),
-        `import pathlib,subprocess,time
-subprocess.Popen(['/usr/bin/python3','descendant.py'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        `import pathlib,subprocess,time,sys
+subprocess.Popen([sys.executable,'descendant.py'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 while not pathlib.Path('descendant.pid').exists(): time.sleep(0.005)
 pathlib.Path('ready').write_text('ready')
 time.sleep(20)
@@ -770,7 +775,7 @@ time.sleep(20)
         version: 1,
         configuration: draft(
           'evaluate.py',
-          expected === 'timed_out' ? 500 : 5000,
+          expected === 'timed_out' ? 1500 : 5000,
         ),
         fingerprint: 'fixture',
         approvedAt: new Date().toISOString(),
@@ -800,13 +805,7 @@ time.sleep(20)
         readFileSync(join(workspace, 'descendant.pid'), 'utf8'),
       );
       expect(pid).toBeGreaterThan(0);
-      let state = '';
-      try {
-        state = readFileSync(`/proc/${pid}/stat`, 'utf8').split(' ')[2]!;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-      }
-      expect(['', 'Z', 'X']).toContain(state);
+      expectStopped(pid);
       execution.cancel(); // Completion must make later cancellation a no-op.
     },
   );
