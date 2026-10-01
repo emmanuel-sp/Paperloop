@@ -118,7 +118,7 @@
   max-width: 1440px;
   width: 100%;
   margin: 0 auto;
-  padding: 48px 48px 80px;
+  padding: 32px 48px 64px;
   min-width: 0;
 }
 
@@ -510,39 +510,27 @@ h3 {
 }
 
 .overview-lead {
-  justify-content: space-between;
-  margin-bottom: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 140px;
   align-items: center;
-  gap: 48px;
-  min-height: 570px;
-  margin: 0 0 48px;
+  gap: 24px;
+  margin: 0;
 }
 
 .overview-lead h2 {
-  margin-bottom: 18px;
-  font-size: clamp(64px, 7.2vw, 108px);
+  font-size: 28px;
   font-weight: 400;
-  letter-spacing: -0.035em;
-  line-height: 0.98;
-  max-width: none;
-  margin: 0 0 32px;
-}
-
-.overview-lead h2 span {
-  color: #7c7a75;
-}
-
-.overview-lead h2 span:last-child {
-  color: #696660;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  margin: 0 0 8px;
 }
 
 .overview-lead p {
   color: var(--muted);
-  font-size: 18px;
-  max-width: 40ch;
-  margin-bottom: 24px;
+  font-size: 16px;
+  max-width: 64ch;
+  margin-bottom: 16px;
 }
 
 .overview-visual {
@@ -557,14 +545,6 @@ h3 {
   opacity: 0.68;
 }
 
-.overview-visual .visual-caption {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  text-align: center;
-  max-width: none;
-  margin: 0;
-}
-
 .overview-loop {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -576,7 +556,7 @@ h3 {
   display: flex;
   gap: 18px;
   align-items: center;
-  padding: 24px;
+  padding: 16px;
   border: 1px solid var(--panel-border);
   border-radius: 2px;
   color: var(--ink);
@@ -591,7 +571,7 @@ h3 {
 .overview-loop a > span {
   display: grid;
   gap: 6px;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 400;
   min-width: 0;
 }
@@ -640,7 +620,7 @@ h3 {
 .stat-card strong {
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
-  font-size: 64px;
+  font-size: 32px;
   font-weight: 400;
   letter-spacing: -0.035em;
 }
@@ -715,7 +695,7 @@ h3 {
 
 .comparison-value {
   display: block;
-  font-size: clamp(64px, 7vw, 100px);
+  font-size: 44px;
   font-weight: 400;
   letter-spacing: -0.05em;
   line-height: 1.1;
@@ -772,7 +752,7 @@ h3 {
   letter-spacing: -1px;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
-  font-size: clamp(54px, 5vw, 76px);
+  font-size: 32px;
   font-weight: 400;
 }
 
@@ -803,24 +783,20 @@ h3 {
 
 .settings-intro {
   grid-column: 1 / -1;
-  text-align: center;
-  padding: 24px 0 64px;
+  text-align: left;
+  padding: 0;
 }
 
 .settings-intro h2 {
-  font-size: clamp(64px, 7vw, 100px);
+  font-size: 24px;
   font-weight: 400;
   letter-spacing: -0.035em;
-  line-height: 1.03;
-  margin: 0 0 24px;
-}
-
-.settings-intro h2 span {
-  color: #7c7a75;
+  line-height: 1.3;
+  margin: 0 0 8px;
 }
 
 .settings-intro p {
-  font-size: 18px;
+  font-size: 16px;
   color: var(--muted);
 }
 
@@ -971,7 +947,6 @@ h3 {
   }
 
   .overview-lead {
-    min-height: 470px;
     gap: 24px;
   }
 
@@ -1051,13 +1026,11 @@ h3 {
 
   .overview-lead {
     grid-template-columns: 1fr;
-    min-height: 0;
-    gap: 32px;
-    margin-bottom: 32px;
+    gap: 16px;
   }
 
   .overview-lead h2 {
-    font-size: clamp(56px, 17.4vw, 88px);
+    font-size: 24px;
   }
 
   .overview-lead p {
@@ -1065,8 +1038,7 @@ h3 {
   }
 
   .overview-visual {
-    max-width: 380px;
-    margin: 0 auto;
+    display: none;
   }
 
   .overview-loop {
@@ -1079,7 +1051,7 @@ h3 {
   }
 
   .overview-loop a > span {
-    font-size: 24px;
+    font-size: 18px;
   }
 
   .stat-card {
@@ -1087,7 +1059,7 @@ h3 {
   }
 
   .stat-card strong {
-    font-size: 48px;
+    font-size: 32px;
   }
 
   .stat-card > span {
@@ -1112,7 +1084,7 @@ h3 {
   }
 
   .comparison-value {
-    font-size: 72px;
+    font-size: 40px;
   }
 
   .schedule-card {
@@ -1120,16 +1092,16 @@ h3 {
   }
 
   .schedule-time {
-    font-size: 60px;
+    font-size: 32px;
   }
 
   .settings-intro {
-    padding: 8px 0 32px;
+    padding: 0;
     text-align: left;
   }
 
   .settings-intro h2 {
-    font-size: 58px;
+    font-size: 24px;
   }
 
   .settings-intro p {

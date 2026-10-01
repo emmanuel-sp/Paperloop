@@ -48,14 +48,10 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
   return (
     <section className="discovery-stage">
       <div className="discovery-intro">
-        <h2>
-          Research,
-          <br />
-          <span>with direction.</span>
-        </h2>
+        <h2>Discover research</h2>
         <p>
-          Find ideas that move your project forward. Your agent can turn the
-          evidence into a change worth testing.
+          Search public sources for relevant papers, then ask your coding agent
+          to assess the evidence.
         </p>
       </div>
       <div>
@@ -93,6 +89,12 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
             </button>
           </div>
         </form>
+        {search.isPending ? (
+          <p role="status" className="workflow-notice">
+            Searching public sources and collecting papers. Agent analysis has
+            not started.
+          </p>
+        ) : null}
         {!sources.isPending &&
         !sources.isError &&
         !sources.data?.sources.length ? (
@@ -118,7 +120,9 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
         <div className="scan-outcomes">
           <div role="status" className="section-heading">
             <h3>{latest.documentIds.length} documents collected</h3>
-            {latest.analysisStatus === 'waiting_for_agent' ? (
+            {!latest.documentIds.length ? (
+              <span className="workflow-status">No papers to assess</span>
+            ) : latest.analysisStatus === 'waiting_for_agent' ? (
               <WorkflowStatus value="waiting_for_agent" />
             ) : (
               <span className="workflow-status status-completed">
@@ -126,6 +130,13 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
               </span>
             )}
           </div>
+          {latest.analysisStatus === 'waiting_for_agent' &&
+          latest.documentIds.length > 0 ? (
+            <p role="status" className="workflow-notice">
+              Papers are ready for assessment. Waiting for a coding agent to
+              take the work; collecting papers does not start an agent.
+            </p>
+          ) : null}
           {latest.outcomes.map((item) => (
             <div className="scan-outcome" key={item.sourceId}>
               <div>
