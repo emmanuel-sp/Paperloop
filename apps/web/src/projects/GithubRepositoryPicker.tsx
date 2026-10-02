@@ -96,7 +96,8 @@ export function GithubRepositoryPicker({
         </p>
         <p>
           For restricted access, configure a fine-grained token for selected
-          repositories with read-only metadata permission in the service’s{' '}
+          repositories with read-only Metadata permission for browsing and
+          read-only Contents permission for context suggestions in the service’s{' '}
           <code>GH_TOKEN</code> environment. Private repositories require
           authorization, including any organization approval. Keep the token
           outside project files.

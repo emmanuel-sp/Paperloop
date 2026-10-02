@@ -1,4 +1,4 @@
-/* global process, console, URL */
+/* global process, console, URL, Buffer */
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { tmpdir } from 'node:os';
@@ -13,6 +13,8 @@ const root = mkdtempSync(join(tmpdir(), 'paperloop-browser-'));
 const repository = join(root, 'repository');
 execFileSync('git', ['init', repository]);
 writeFileSync(join(repository, 'score.txt'), '10');
+writeFileSync(join(repository, 'README.md'), '# Retrieval lab\n\nA small retrieval system for measuring relevant answers.\n\n## Objectives\n- Improve answer grounding\n\n## Constraints\n- Keep evaluation local\n');
+writeFileSync(join(repository, 'package.json'), JSON.stringify({ description: 'Measure retrieval quality with a tiny local harness.', scripts: { test: 'python3 evaluate.py' }, engines: { node: '>=24' } }));
 writeFileSync(
   join(repository, 'evaluate.py'),
   `import json, pathlib
@@ -57,6 +59,12 @@ const app = createApp({
     if (endpoint.startsWith('/search/')) {
       const query = new URL(`https://api.github.com${endpoint}`).searchParams.get('q');
       return { items: githubRepos.filter((repo) => repo.full_name.includes(query)) };
+    }
+    if (/\/commits\//.test(endpoint)) return { sha: 'a'.repeat(40) };
+    const file = endpoint.match(/\/contents\/([^?]+)\?ref=/)?.[1];
+    if (file && ['README.md', 'package.json'].includes(file)) {
+      const content = file === 'package.json' ? JSON.stringify({ description: 'Measure retrieval research against a private repository.', scripts: { test: 'python3 evaluate.py' } }) : '# Research lab\n\nResearch context.\n\n## Goals\n- Improve grounded answers\n';
+      return { type: 'file', path: file, size: content.length, encoding: 'base64', content: Buffer.from(content).toString('base64') };
     }
     const repo = githubRepos.find((value) => endpoint === `/repos/${value.full_name}`);
     if (!repo) throw new GithubAccessError('GITHUB_ACCESS_DENIED', 'This GitHub connection cannot read the requested repository.', 403);
