@@ -25,7 +25,7 @@ The remaining #37 flow now asks for name/repository first, then shows an editabl
 
 A maximum of 32 in-memory previews expire after 15 minutes or restart. Creation validates the preview's repository identity and rechecks GitHub access, then saves server-derived capture time, revision, hashes, uncertainty, suggested research direction/evaluation capabilities and user correction fields atomically alongside the initial context snapshot in the existing private app-state table. No migration is needed. Provenance remains in context history on later edits; neither a preview nor a detected test script approves an Evaluation or runs a command.
 
-Local verification covers 109 service tests, the contract test, the 21 browser workflows, and installed release smoke. New workflow checks cover local/GitHub/description-only setup, invalid paths, loading, unavailable inspection, correction retention, revoked access before saving, refresh, and provenance. Populated desktop/mobile captures are under `test-results/onboarding/`, retained in CI as `onboarding-<os>`. Final issue completion requires the reviewed PR to merge after Linux/macOS CI passes.
+Local verification covers 110 service tests, the contract test, the 21 browser workflows, and installed release smoke. New workflow checks cover local/GitHub/description-only setup, invalid paths, loading, unavailable inspection, correction retention, revoked access before saving, refresh, and provenance. File aliases are deduplicated so case-insensitive filesystems retain each evidence document once. Populated desktop/mobile captures are under `test-results/onboarding/`, retained in CI as `onboarding-<os>`. Final issue completion requires the reviewed PR to merge after Linux/macOS CI passes.
 
 ## Next bounded unit
 

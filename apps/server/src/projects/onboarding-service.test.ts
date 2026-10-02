@@ -1,4 +1,10 @@
-import { mkdtempSync, writeFileSync, symlinkSync } from 'node:fs';
+import {
+  existsSync,
+  linkSync,
+  mkdtempSync,
+  writeFileSync,
+  symlinkSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -52,6 +58,19 @@ function makeApp(data = directory()) {
 }
 
 describe('bounded onboarding context', () => {
+  it('records a document only once when root filenames alias the same file', async () => {
+    const root = fixture();
+    const alias = join(root, 'readme.md');
+    if (!existsSync(alias)) linkSync(join(root, 'README.md'), alias);
+    const service = new OnboardingService(new GithubService());
+    const preview = await service.preview({ kind: 'local', path: root });
+    expect(preview.inference.files.map((file) => file.path)).toEqual([
+      'README.md',
+      'package.json',
+    ]);
+    expect(preview.objectives).toEqual(['Improve grounding']);
+  });
+
   it('infers metadata, preserves user corrections/provenance across restart, and never runs scripts or approves plans', async () => {
     const root = fixture();
     const data = directory();

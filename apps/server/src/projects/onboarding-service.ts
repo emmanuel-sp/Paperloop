@@ -46,6 +46,7 @@ async function localFiles(
   uncertainty: string[],
 ): Promise<EvidenceFile[]> {
   const results: EvidenceFile[] = [];
+  const seenFiles = new Set<string>();
   // Fixed root filenames only. Never follow a document symlink or execute code.
   for (const name of FILES) {
     let file;
@@ -61,6 +62,10 @@ async function localFiles(
         );
         continue;
       }
+      // Case-insensitive names and hard links can identify the same document.
+      const identity = `${info.dev}:${info.ino}`;
+      if (seenFiles.has(identity)) continue;
+      seenFiles.add(identity);
       const bytes = Buffer.alloc(MAX_FILE_BYTES + 1);
       const read = await file.read(bytes, 0, bytes.length, 0);
       if (read.bytesRead > MAX_FILE_BYTES) continue;
