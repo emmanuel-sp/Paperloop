@@ -43,6 +43,12 @@ jobs:
           path: |
             playwright-report/
             test-results/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-launch-${{ matrix.os }}
+          path: test-results/browser-launch/
+          if-no-files-found: ignore
       - run: pnpm release
       - run: npm ci --omit=dev
         working-directory: release/paperloop

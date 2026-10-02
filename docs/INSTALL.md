@@ -14,13 +14,15 @@ npm start
 
 The bundle contains the compiled server, workbench, contracts, database migrations, documentation, and a dependency lock. Install dependencies on the target OS so SQLite's native module matches that platform. If a native prebuilt module is unavailable, npm needs the platform C/C++ build tools. The bundle needs no source checkout, pnpm, or TypeScript compiler.
 
-Open `http://localhost:3000`. Startup prints the connection-secret **file path**. Read that file and paste its value into the workbench. Do not share it or commit it to Git. Startup also reports the data directory, Node version, workbench location, and whether Git and Python are available.
+Startup opens your default browser at the service's actual loopback address and connects it automatically. The local launcher passes a random one-time capability in a URL fragment; the page removes it immediately and exchanges it for an HttpOnly, same-site session cookie. The link expires after 60 seconds, works only at the launched origin, and cannot be reused. The long-lived connection secret stays in its owner-only local file and is never placed in the launch URL or printed.
+
+If automatic browser launch is unavailable (for example on a headless computer), open the address printed in the terminal and use the manual connection form. Startup prints the connection-secret **file path**; read that file locally and paste its value into the workbench. Do not share it or commit it to Git. Use `npm start -- --no-open` (or `pnpm start --no-open` from source) to skip browser launch deliberately. An expired link can be replaced by restarting the service, or by using manual connection. Startup also reports the data directory, Node version, workbench location, and whether Git and Python are available.
 
 From source, use Node 24 and pnpm 10.18.3: `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm doctor`, then `pnpm start`. Build a bundle with `pnpm release`.
 
 ## Windows through WSL2
 
-Keep the application, repositories, and dependencies inside the WSL filesystem. Run all install/start/evaluation commands in that same distribution. Open `http://localhost:3000` in your Windows browser. To read the credential from PowerShell, use `wsl cat /path/printed/by/startup/connection-secret`.
+Keep the application, repositories, and dependencies inside the WSL filesystem. Run all install/start/evaluation commands in that same distribution. Startup uses Windows PowerShell's `Start-Process` to open the Windows browser when WSL interoperability is available. If it is disabled or loopback forwarding is unavailable, use the printed address and manual connection; the launcher cannot guarantee that a browser successfully reached the service. To read the credential locally from PowerShell, use `wsl cat /path/printed/by/startup/connection-secret`.
 
 ## Configuration and diagnostics
 
