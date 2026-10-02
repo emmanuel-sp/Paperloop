@@ -25,22 +25,17 @@ import { AsyncState } from '../components/AsyncState';
 export function ResearchWorkspace({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
-  const views = ['discovery', 'recommendations', 'library'] as const;
   const rawView = params.get('view');
-  const view = views.find((item) => item === rawView) ?? 'discovery';
-  const [returnView, setReturnView] = useState(view);
-  const openSecondary = (next: 'sources' | 'supply') => {
-    setReturnView(view);
+  const openSecondary = (next: 'sources' | 'supply' | 'library') =>
     setParams((previous) => {
       const updated = new URLSearchParams(previous);
       updated.set('view', next);
       return updated;
     });
-  };
   const closeSecondary = () =>
     setParams((previous) => {
       const updated = new URLSearchParams(previous);
-      updated.set('view', returnView);
+      updated.delete('view');
       return updated;
     });
   const selectedId = params.get('paper') ?? undefined;
@@ -48,6 +43,7 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
     setParams((previous) => {
       const updated = new URLSearchParams(previous);
       updated.set('paper', id);
+      updated.delete('view');
       return updated;
     });
   const queryKey = ['projects', projectId, 'research'] as const;
@@ -62,7 +58,7 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
       setParams((previous) => {
         const updated = new URLSearchParams(previous);
         updated.set('paper', document.id);
-        updated.set('view', 'library');
+        updated.delete('view');
         return updated;
       });
       await queryClient.invalidateQueries({ queryKey });
@@ -102,32 +98,14 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
   return (
     <div className="research-stack">
       <div className="research-toolbar">
-        <nav className="research-view-nav" aria-label="Research views">
-          {views.map((value) => (
-            <button
-              className="button"
-              aria-pressed={view === value}
-              type="button"
-              key={value}
-              onClick={() =>
-                setParams((previous) => {
-                  const updated = new URLSearchParams(previous);
-                  updated.set('view', value);
-                  return updated;
-                })
-              }
-            >
-              {
-                {
-                  discovery: 'Discover',
-                  recommendations: 'Recommendations',
-                  library: 'Saved research',
-                }[value]
-              }
-            </button>
-          ))}
-        </nav>
         <div className="form-actions">
+          <button
+            type="button"
+            className="button tertiary"
+            onClick={() => openSecondary('library')}
+          >
+            Saved research
+          </button>
           <button
             type="button"
             className="button tertiary"
@@ -151,18 +129,8 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
         className={`research-layout ${selectedId ? '' : 'research-unselected'}`}
       >
         <div className="research-stack">
-          {view === 'discovery' ? (
-            <DiscoveryPanel projectId={projectId} />
-          ) : null}
-          {view === 'recommendations' ? (
-            <RecommendationPanel
-              projectId={projectId}
-              onSelect={setSelectedId}
-            />
-          ) : null}
-          {view === 'library' ? (
-            <LibraryPanel projectId={projectId} onSelect={setSelectedId} />
-          ) : null}
+          <RecommendationPanel projectId={projectId} onSelect={setSelectedId} />
+          <DiscoveryPanel projectId={projectId} />
         </div>
         {selectedId ? (
           <PaperDetail
@@ -172,6 +140,16 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
           />
         ) : null}
       </div>
+      <Dialog
+        open={rawView === 'library'}
+        title="Saved research"
+        description="Find collected papers or reuse material from another project."
+        onClose={closeSecondary}
+      >
+        {rawView === 'library' ? (
+          <LibraryPanel projectId={projectId} onSelect={setSelectedId} />
+        ) : null}
+      </Dialog>
       <Dialog
         open={rawView === 'sources'}
         title="Research sources"
