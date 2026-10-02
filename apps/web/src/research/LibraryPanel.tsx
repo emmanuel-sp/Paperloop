@@ -57,8 +57,8 @@ export function LibraryPanel({
   return (
     <section className="detail-panel research-stack">
       <div>
-        <p className="eyebrow">Local library</p>
-        <h2>Your research library</h2>
+        <p className="eyebrow">Collected papers</p>
+        <h2>Saved research</h2>
       </div>
       <form className="research-form" onSubmit={submit}>
         <label>
@@ -92,11 +92,11 @@ export function LibraryPanel({
           Search across all projects
         </label>
         <button className="button" type="submit">
-          Search library
+          Search saved research
         </button>
       </form>
       {results.isPending ? (
-        <p role="status">Searching local library…</p>
+        <p role="status">Searching saved research…</p>
       ) : results.isError ? (
         <p role="alert">{errorMessage(results.error)}</p>
       ) : results.data.documents.length ? (
@@ -121,7 +121,7 @@ export function LibraryPanel({
         </div>
       ) : (
         <div className="empty-inline">
-          <h3>{query ? 'No matching papers' : 'Your library is empty'}</h3>
+          <h3>{query ? 'No matching papers' : 'No saved research yet'}</h3>
           <p>
             {query
               ? 'Try a shorter search or search across all projects.'

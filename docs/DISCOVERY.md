@@ -1,8 +1,8 @@
 # Research discovery and triage
 
-Open a project's **Sources & schedules** section, choose collections or individual sources, optionally add public RSS/Atom feeds, and save. Collections are data in `apps/server/src/research/source-catalog.ts`; adding another topic does not change scan orchestration. Projects start with no sources selected and retain independent selections.
+Open **Sources** in a project's **Research** page, choose collections or individual sources, optionally add public RSS/Atom feeds, and save. Collections are data in `apps/server/src/research/source-catalog.ts`; adding another topic does not change scan orchestration. Projects start with no sources selected and retain independent selections.
 
-In **Research**, use **Discovery & recommendations** to search selected sources. Each scan persists its query, document IDs, per-source outcome, coverage, retry time, and next offset. Use **Next page** for additional results. One failed source does not erase successful results from another. **Local library** searches indexed titles, authors, and extracted text; enable **Search across all projects** to reuse a document in the current project. **Supply a paper** still accepts references and text already available to a user or agent. A public article URL can also be fetched directly.
+In **Research**, agent proposals and discovery share one page. Use the discovery composer to search selected sources. Each scan persists its query, document IDs, per-source outcome, coverage, retry time, and next offset. Use **Next page** for additional results. One failed source does not erase successful results from another. The **Saved research** dialog searches indexed titles, authors, and extracted text; enable **Search across all projects** to reuse a document in the current project. **Import paper** accepts references and text already available to a user or agent. A public article URL can also be fetched directly.
 
 ## Coverage and limits
 

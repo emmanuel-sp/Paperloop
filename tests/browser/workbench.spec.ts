@@ -33,14 +33,13 @@ test('navigation, paper evidence, keyboard focus, and narrow layouts', async ({
   await expect(
     page.getByRole('heading', { name: 'A focused retrieval technique' }),
   ).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Recommendations', exact: true })
-    .click();
-  await expect(page).toHaveURL(/view=recommendations/);
-  await page.goBack();
-  await expect(
-    page.getByRole('button', { name: 'Saved research', exact: true }),
-  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('navigation', { name: 'Research views' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Discover research', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ideas to build on.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Saved research', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Saved research', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close Saved research' }).click();
+  await expect(page).not.toHaveURL(/view=library/);
   for (const name of ['Experiments', 'Schedules', 'Settings']) {
     await page.getByRole('link', { name, exact: true }).click();
     await expect(
@@ -694,7 +693,7 @@ test('library filters survive reload and schedule removal requires confirmation'
     .getByLabel('Search title, authors, or extracted text')
     .fill('retrieval');
   await page
-    .getByRole('button', { name: 'Search library', exact: true })
+    .getByRole('button', { name: 'Search saved research', exact: true })
     .click();
   await expect(page).toHaveURL(/libraryQuery=retrieval/);
   await page.reload();
@@ -709,6 +708,7 @@ test('library filters survive reload and schedule removal requires confirmation'
   await expect(page.getByLabel('Search across all projects')).toBeChecked();
   await page.goBack();
   await expect(page.getByLabel('Search across all projects')).not.toBeChecked();
+  await page.getByRole('button', { name: 'Close Saved research' }).click();
   await page.getByRole('link', { name: 'Schedules', exact: true }).click();
   const remove = page
     .getByRole('button', { name: 'Remove', exact: true })
