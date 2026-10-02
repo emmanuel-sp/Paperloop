@@ -25,17 +25,50 @@ export const projectRepositorySchema = z.discriminatedUnion('kind', [
 ]);
 export type ProjectRepository = z.infer<typeof projectRepositorySchema>;
 
+export const inferredProjectContextSchema = z.object({
+  method: z.literal('repository-metadata-v1'),
+  capturedAt: z.iso.datetime(),
+  repositoryRevision: z.string().nullable(),
+  files: z.array(z.object({ path: z.string(), sha256: z.string() })),
+  uncertainty: z.array(z.string()),
+  researchDirection: z.string().max(500),
+  evaluationCapabilities: z.array(
+    z.object({ name: z.string(), source: z.string() }),
+  ),
+  correctedFields: z.array(z.string()).default([]),
+});
+export type InferredProjectContext = z.infer<
+  typeof inferredProjectContextSchema
+>;
+
+export const projectOnboardingRequestSchema = z.object({
+  name: nonEmptyText.max(120),
+  repository: projectRepositorySchema.optional(),
+});
+export const projectOnboardingPreviewSchema = z.object({
+  id: z.uuid(),
+  description: z.string().max(10_000),
+  objectives: z.array(z.string().max(500)).max(50),
+  constraints: z.array(z.string().max(500)).max(50),
+  inference: inferredProjectContextSchema,
+});
+export type ProjectOnboardingPreview = z.infer<
+  typeof projectOnboardingPreviewSchema
+>;
+
 export const createProjectRequestSchema = z.object({
   name: nonEmptyText.max(120),
   description: nonEmptyText.max(10_000),
   objectives: z.array(nonEmptyText.max(500)).max(50).default([]),
   constraints: z.array(nonEmptyText.max(500)).max(50).default([]),
   repository: projectRepositorySchema.optional(),
+  contextPreviewId: z.uuid().optional(),
+  researchDirection: z.string().trim().max(500).optional(),
 });
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 
 export const updateProjectRequestSchema = createProjectRequestSchema
-  .omit({ repository: true })
+  .omit({ repository: true, contextPreviewId: true, researchDirection: true })
   .partial()
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one project field is required.',
@@ -58,6 +91,7 @@ export const projectContextSchema = z.object({
   sourceReference: z.string().nullable(),
   repositoryRevision: z.string().nullable(),
   capturedAt: z.iso.datetime(),
+  inference: inferredProjectContextSchema.optional(),
 });
 export type ProjectContext = z.infer<typeof projectContextSchema>;
 

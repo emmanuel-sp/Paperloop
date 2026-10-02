@@ -167,6 +167,15 @@ function ProjectOverview({ project }: { project: Project }) {
         <details>
           <summary>Context & provenance</summary>
           <p>{project.currentContext.summary}</p>
+          {project.currentContext.inference ? (
+            <div>
+              <p>Suggested from read-only repository metadata on {new Date(project.currentContext.inference.capturedAt).toLocaleString()}.</p>
+              <p>Research direction: {project.currentContext.inference.researchDirection || 'Not specified'}</p>
+              <p>Inspected files: {project.currentContext.inference.files.map((file) => file.path).join(', ') || 'None'}</p>
+              <p>Corrections: {project.currentContext.inference.correctedFields.join(', ') || 'No changes to the suggestion'}</p>
+              <ul>{project.currentContext.inference.uncertainty.map((value) => <li key={value}>{value}</li>)}</ul>
+            </div>
+          ) : null}
           <dl className="provenance-list">
             <div>
               <dt>Source</dt>

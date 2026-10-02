@@ -18,7 +18,8 @@ to the local Paperloop service. Paperloop does not create an account, receive
 credentials from the browser, or put GitHub tokens in project data.
 
 For least-privilege private access, use a fine-grained token restricted to the
-selected repositories with Metadata read-only permission, configured through the
+selected repositories with Metadata read-only permission for browsing and Contents
+read-only permission for document inspection, configured through the
 service process's `GH_TOKEN` environment. GitHub CLI's interactive login may request
 broader scopes; Paperloop itself performs only read requests. Organization approval,
 SSO policies and token access must permit the repository. Never put credentials in
@@ -37,8 +38,12 @@ logging credential diagnostics.
 ## Research context and execution
 
 Selecting GitHub registers a read-only repository reference for research context.
-It does not clone code or claim that files have been analyzed. Repository inference
-belongs to the subsequent onboarding work. A checkout is not needed during setup.
+It does not clone code. Guided setup reads small supported root documentation and
+metadata files, pinned to the default-branch commit when available. It suggests
+context without a model call, explains missing/unreadable content and uncertainty,
+and preserves capture time, revision, file hashes, and user corrections. Metadata-only
+access can still supply the repository description; private file inference requires
+Contents permission. A checkout is not needed during setup.
 
 When starting an experiment from a paper, a GitHub project asks for an existing
 absolute local checkout path. The checkout needs a commit and an `origin` matching

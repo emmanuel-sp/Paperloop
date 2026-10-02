@@ -17,8 +17,18 @@ Service checks cover expiry, replacement, origin/port binding, missing/wrong cre
 
 Launch screenshots are saved under `test-results/browser-launch/` and retained by Linux/macOS CI as `browser-launch-<os>` artifacts. Inspect the populated Overview, connected Research, and expired-link desktop/mobile captures. The manual fallback was also inspected with agent-browser without an error overlay or JavaScript errors.
 
+## Inferred onboarding phase
+
+The remaining #37 flow now asks for name/repository first, then shows an editable context summary and compact objective/constraint/evaluation suggestions. Optional details let users correct the research direction and constraints. Errors retain the selected repository and corrections; missing context asks only for a short project summary. Suggestions require no provider key or model spending.
+
+`POST /api/v1/projects/onboarding` uses bounded read-only inspection: at most seven fixed root filenames, 32 KiB each, plus a bounded Git revision query. Local document symlinks, non-regular and oversized files are rejected. GitHub files are fetched at a validated commit SHA when available, without cloning or following remote download URLs. Missing files/revisions return honest partial context. Private file access requires read-only Contents permission; repository Metadata alone still supports selection and a description fallback.
+
+A maximum of 32 in-memory previews expire after 15 minutes or restart. Creation validates the preview's repository identity and rechecks GitHub access, then saves server-derived capture time, revision, hashes, uncertainty, suggested research direction/evaluation capabilities and user correction fields atomically alongside the initial context snapshot in the existing private app-state table. No migration is needed. Provenance remains in context history on later edits; neither a preview nor a detected test script approves an Evaluation or runs a command.
+
+Local verification covers 110 service tests, the contract test, the 21 browser workflows, and installed release smoke. New workflow checks cover local/GitHub/description-only setup, invalid paths, loading, unavailable inspection, correction retention, revoked access before saving, refresh, and provenance. File aliases are deduplicated so case-insensitive filesystems retain each evidence document once. Populated desktop/mobile captures are under `test-results/onboarding/`, retained in CI as `onboarding-<os>`. Final issue completion requires the reviewed PR to merge after Linux/macOS CI passes.
+
 ## Next bounded unit
 
-Continue #37 with inferred project onboarding: ask for project identity and repository selection, read bounded repository metadata/files with provenance, infer a concise editable summary/objectives/constraints/research direction and available evaluation capabilities, and handle unavailable inference/access inline without losing input. Treat repository content as untrusted data, keep no-key behavior truthful, and preserve GitHub access revalidation. Do not start #39 until #37 is complete.
+After #37 is verified and merged, continue #39's unified Research feed before #40's broad import, following #34's dependency order. The Research work should consume persisted inferred direction/context, retain triage, and keep execution/tracking status truthful. Draft Evaluation approval remains the separate #41 phase.
 
 GitHub Project #2 is inaccessible to this integration (`Resource not accessible by integration`); issue dependencies and #34 provide the available queue. Current quota telemetry is unavailable, so the requested 10% personal usage reserve cannot be enforced automatically. This manually requested run takes one bounded phase and creates no development schedule.

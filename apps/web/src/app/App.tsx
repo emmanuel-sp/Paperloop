@@ -153,6 +153,7 @@ function NewProjectPage({ projects }: { projects: Project[] }) {
   return (
     <AppShell projects={projects}>
       <ProjectForm
+        onResetError={() => mutation.reset()}
         error={mutation.isError ? messageFromError(mutation.error) : undefined}
         isPending={mutation.isPending}
         onSubmit={(input: CreateProjectRequest) => mutation.mutate(input)}

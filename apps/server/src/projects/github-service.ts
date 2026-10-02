@@ -194,4 +194,69 @@ export class GithubService {
       await this.api(`/repos/${identity.owner}/${identity.repository}`),
     );
   }
+
+  async contextFiles(
+    repository: GithubRepository,
+    names: string[],
+    maxBytes: number,
+  ) {
+    const prefix = `/repos/${repository.owner}/${repository.repository}`;
+    let revision: string | null = null;
+    try {
+      const commit = z
+        .object({ sha: z.string().regex(/^[a-f0-9]{40}$/i) })
+        .parse(
+          await this.api(
+            `${prefix}/commits/${encodeURIComponent(repository.defaultBranch ?? 'HEAD')}`,
+          ),
+        );
+      revision = commit.sha;
+    } catch {
+      return {
+        revision,
+        files: [],
+        uncertainty: [
+          'The default-branch revision was unavailable. Only repository metadata was used; retry inspection for file context.',
+        ],
+      };
+    }
+    const pinned = revision;
+    const outcomes = await Promise.all(
+      names.map(async (path) => {
+        try {
+          const response = z
+            .object({
+              type: z.literal('file'),
+              path: z.literal(path),
+              size: z.number().nonnegative(),
+              encoding: z.literal('base64'),
+              content: z.string(),
+            })
+            .parse(
+              await this.api(
+                `${prefix}/contents/${encodeURIComponent(path)}?ref=${pinned}`,
+              ),
+            );
+          if (
+            response.size > maxBytes ||
+            response.content.length > maxBytes * 2
+          )
+            return null;
+          const bytes = Buffer.from(response.content, 'base64');
+          if (bytes.length > maxBytes) return null;
+          return { path, content: bytes.toString('utf8') };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const files = outcomes.filter((value) => value !== null);
+    return {
+      revision: pinned,
+      files,
+      uncertainty: [
+        'Only supported root documentation and metadata were inspected. Missing, oversized, or unreadable files were skipped; private content needs read-only Contents permission.',
+      ],
+    };
+  }
 }

@@ -6,10 +6,12 @@ import {
   projectSchema,
   refreshProjectContextRequestSchema,
   updateProjectRequestSchema,
+  projectOnboardingRequestSchema,
 } from '@paperloop/contracts';
 import type { FastifyInstance } from 'fastify';
 import { ProjectService } from './project-service.js';
 import { GithubService } from './github-service.js';
+import { OnboardingService } from './onboarding-service.js';
 
 interface ProjectParameters {
   id: string;
@@ -20,6 +22,11 @@ export function registerProjectRoutes(
   service: ProjectService,
   github: GithubService,
 ): void {
+  const onboarding = new OnboardingService(github);
+  app.post('/api/v1/projects/onboarding', async (request) => {
+    const input = projectOnboardingRequestSchema.parse(request.body);
+    return onboarding.preview(input.repository);
+  });
   app.get('/api/v1/projects', async () =>
     projectListResponseSchema.parse({ projects: service.list() }),
   );
@@ -37,7 +44,7 @@ export function registerProjectRoutes(
         repository: selected.repository,
       };
     }
-    const project = service.create(input);
+    const project = service.create(input, onboarding.read(input));
     return reply.code(201).send(projectSchema.parse(project));
   });
 

@@ -1157,3 +1157,14 @@ h3 {
   color: var(--muted);
   font-size: 0.875rem;
 }
+
+.onboarding-panel { max-width: 840px; }
+.onboarding-fields { border: 0; padding: 0; margin: 0; display: grid; gap: 24px; min-width: 0; }
+.onboarding-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.onboarding-summary section, .onboarding-evidence { padding: 18px; background: var(--surface); border: 1px solid var(--panel-border); border-radius: 12px; }
+.onboarding-panel h2 { font-size: 16px; margin: 0 0 10px; }
+.onboarding-panel ul { padding-left: 20px; margin: 0; }
+.onboarding-panel li { margin-bottom: 8px; overflow-wrap: anywhere; }
+.onboarding-panel details p { overflow-wrap: anywhere; }
+.onboarding-panel details > .project-form { margin-top: 16px; }
+@media (max-width: 600px) { .onboarding-summary { grid-template-columns: minmax(0, 1fr); } }

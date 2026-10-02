@@ -12,9 +12,6 @@ async function setup(page: Page) {
   await page
     .getByLabel('Project name', { exact: true })
     .fill('GitHub research lab');
-  await page
-    .getByLabel('What does this project do?')
-    .fill('Measure retrieval research against a private repository.');
   await page.getByRole('radio', { name: 'GitHub', exact: true }).check();
   return repository;
 }
@@ -30,7 +27,7 @@ test('connected private search and URL selection retain input after revoked acce
     page.getByRole('button', { name: /research-team\/private-lab/ }),
   ).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'Create project', exact: true }),
+    page.getByRole('button', { name: 'Continue', exact: true }),
   ).toBeDisabled();
   await page.getByLabel('Search GitHub repositories').fill('no-results');
   await page
@@ -74,7 +71,7 @@ test('connected private search and URL selection retain input after revoked acce
   await page.getByRole('button', { name: 'Check repository' }).click();
   await expect(page.getByRole('alert')).toContainText('cannot read');
   await expect(
-    page.getByRole('button', { name: 'Create project', exact: true }),
+    page.getByRole('button', { name: 'Continue', exact: true }),
   ).toBeDisabled();
   await page
     .getByLabel('GitHub repository URL')
@@ -87,7 +84,7 @@ test('connected private search and URL selection retain input after revoked acce
   ).toBeVisible();
   await page.request.post('/__test/github', { data: { state: 'denied' } });
   await page
-    .getByRole('button', { name: 'Create project', exact: true })
+    .getByRole('button', { name: 'Continue', exact: true })
     .click();
   await expect(page.getByRole('alert')).toContainText('cannot read');
   await expect(page.getByLabel('Project name', { exact: true })).toHaveValue(
@@ -98,8 +95,10 @@ test('connected private search and URL selection retain input after revoked acce
   );
   await page.request.post('/__test/github', { data: { state: 'connected' } });
   await page
-    .getByRole('button', { name: 'Create project', exact: true })
+    .getByRole('button', { name: 'Continue', exact: true })
     .click();
+  await expect(page.getByRole('heading', { name: 'Review project context' })).toBeVisible();
+  await page.getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/overview$/);
   const projectId = page.url().split('/projects/')[1]!.split('/')[0]!;
   const saved = await page.request.get(`/api/v1/projects/${projectId}`);
@@ -129,7 +128,7 @@ test('connection recovery preserves the form and keeps local setup available', a
       'GitHub research lab',
     );
     await expect(
-      page.getByRole('button', { name: 'Create project', exact: true }),
+      page.getByRole('button', { name: 'Continue', exact: true }),
     ).toBeDisabled();
   }
   await page.request.post('/__test/github', { data: { state: 'connected' } });
@@ -138,8 +137,10 @@ test('connection recovery preserves the form and keeps local setup available', a
   await page.getByRole('radio', { name: 'Local directory' }).check();
   await page.getByLabel('Absolute directory path').fill(repository);
   await page
-    .getByRole('button', { name: 'Create project', exact: true })
+    .getByRole('button', { name: 'Continue', exact: true })
     .click();
+  await expect(page.getByRole('heading', { name: 'Review project context' })).toBeVisible();
+  await page.getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/overview$/);
   await expect(page.getByText('local', { exact: true })).toBeVisible();
 });
@@ -152,11 +153,13 @@ test('GitHub experiment checkout guidance appears only during contextual prepara
     .getByRole('button', { name: /research-team\/private-lab/ })
     .click();
   await expect(
-    page.getByRole('button', { name: 'Create project', exact: true }),
+    page.getByRole('button', { name: 'Continue', exact: true }),
   ).toBeEnabled();
   await page
-    .getByRole('button', { name: 'Create project', exact: true })
+    .getByRole('button', { name: 'Continue', exact: true })
     .click();
+  await expect(page.getByRole('heading', { name: 'Review project context' })).toBeVisible();
+  await page.getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/overview$/);
   const projectId = page.url().split('/projects/')[1]!.split('/')[0]!;
   const paper = await page.request.post(

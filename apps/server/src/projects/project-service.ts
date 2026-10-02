@@ -9,6 +9,8 @@ import {
   type ProjectRepository,
   type RefreshProjectContextRequest,
   type UpdateProjectRequest,
+  type InferredProjectContext,
+  inferredProjectContextSchema,
 } from '@paperloop/contracts';
 import { desc, eq } from 'drizzle-orm';
 import type { PaperloopDatabase } from '../storage/database.js';
@@ -16,6 +18,7 @@ import {
   projectContextSnapshots,
   projectRepositories,
   projects,
+  appState,
 } from '../storage/schema.js';
 
 export class ProjectNotFoundError extends Error {
@@ -42,9 +45,13 @@ interface RepositoryContext {
 export class ProjectService {
   constructor(private readonly database: PaperloopDatabase) {}
 
-  create(input: CreateProjectRequest): Project {
+  create(
+    input: CreateProjectRequest,
+    inference?: InferredProjectContext,
+  ): Project {
     const now = new Date();
     const projectId = randomUUID();
+    const contextId = randomUUID();
     const repositoryContext = input.repository
       ? this.prepareRepository(input.repository)
       : undefined;
@@ -66,23 +73,36 @@ export class ProjectService {
       if (repositoryContext) {
         transaction
           .insert(projectRepositories)
-          .values(repositoryValues(projectId, repositoryContext.repository, now))
+          .values(
+            repositoryValues(projectId, repositoryContext.repository, now),
+          )
           .run();
       }
 
       transaction
         .insert(projectContextSnapshots)
         .values({
-          id: randomUUID(),
+          id: contextId,
           projectId,
           version: 1,
           summary: input.description,
           sourceKind: repositoryContext?.sourceKind ?? 'description',
           sourceReference: repositoryContext?.sourceReference ?? null,
-          repositoryRevision: repositoryContext?.repositoryRevision ?? null,
+          repositoryRevision: inference
+            ? inference.repositoryRevision
+            : (repositoryContext?.repositoryRevision ?? null),
           capturedAt: now,
         })
         .run();
+      if (inference)
+        transaction
+          .insert(appState)
+          .values({
+            key: `context-inference:${contextId}`,
+            value: JSON.stringify(inference),
+            updatedAt: now,
+          })
+          .run();
     });
 
     return this.get(projectId);
@@ -115,7 +135,7 @@ export class ProjectService {
       .where(eq(projectContextSnapshots.projectId, projectId))
       .orderBy(desc(projectContextSnapshots.version))
       .all()
-      .map(contextFromRow);
+      .map((row) => this.contextFromRow(row));
   }
 
   update(projectId: string, input: UpdateProjectRequest): Project {
@@ -158,8 +178,8 @@ export class ProjectService {
       : undefined;
     const revision =
       repositoryContext?.sourceKind === 'github'
-        ? input.repositoryRevision ?? null
-        : repositoryContext?.repositoryRevision ?? null;
+        ? (input.repositoryRevision ?? null)
+        : (repositoryContext?.repositoryRevision ?? null);
 
     this.database.db.transaction((transaction) => {
       transaction
@@ -297,9 +317,29 @@ export class ProjectService {
       objectives: project.objectives,
       constraints: project.constraints,
       repository: repositoryRow ? repositoryFromRow(repositoryRow) : null,
-      currentContext: contextFromRow(context),
+      currentContext: this.contextFromRow(context),
       createdAt: project.createdAt.toISOString(),
       updatedAt: project.updatedAt.toISOString(),
+    };
+  }
+
+  private contextFromRow(
+    row: typeof projectContextSnapshots.$inferSelect,
+  ): ProjectContext {
+    const inference = this.database.db
+      .select()
+      .from(appState)
+      .where(eq(appState.key, `context-inference:${row.id}`))
+      .get();
+    return {
+      ...contextFromRow(row),
+      ...(inference
+        ? {
+            inference: inferredProjectContextSchema.parse(
+              JSON.parse(inference.value),
+            ),
+          }
+        : {}),
     };
   }
 }
