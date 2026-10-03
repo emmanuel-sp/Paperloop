@@ -289,10 +289,14 @@ export class ResearchImportService {
         'Preview expired or does not belong to this project. Preview the import again.',
         409,
       );
+    const duplicateId = this.research.findIdentity(stored.preview.document.sourceKind, stored.preview.document.sourceReference);
+    const existing = duplicateId ? this.research.attach(projectId, duplicateId) : null;
+    const preserveText = existing?.extractedContentAvailable && existing.sourceVersion === (stored.preview.document.sourceVersion ?? null) && !stored.preview.document.extractedContent && !input.extractedContent;
     const document = this.research.ingest(
       projectId,
       ingestResearchDocumentRequestSchema.parse({
         ...stored.preview.document,
+        ...(preserveText ? { extractionStatus: 'pending', extractionError: undefined } : {}),
         ...(input.title ? { title: input.title } : {}),
         ...(input.authors ? { authors: input.authors } : {}),
         ...(input.extractedContent

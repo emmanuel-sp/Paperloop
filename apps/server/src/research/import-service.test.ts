@@ -157,6 +157,7 @@ describe('broad research import', () => {
         document: { extractedContent: text, extractionStatus: 'complete' },
       });
       expect(file.json().document.sourceReference).toMatch(/^file:sha256:/);
+      app.research.ingest(app.projects.list()[0]!.id, { title: 'Existing evidence', sourceKind: 'url', sourceReference: 'https://unavailable.example/paper', authors: [], submittedBy: 'user', extractionStatus: 'complete', extractedContent: 'Previously collected evidence.' });
       const unavailable = await post('preview', {
         input: 'https://unavailable.example/paper',
       });
@@ -164,6 +165,8 @@ describe('broad research import', () => {
         extractionStatus: 'failed',
         extractionError: 'Source returned HTTP 403.',
       });
+      const failedAgain = await post('preview', { input: 'https://unavailable.example/paper' });
+      expect((await post('commit', { previewId: failedAgain.json().id })).json().extractionStatus).toBe('complete');
       expect(
         (
           await post('commit', {
