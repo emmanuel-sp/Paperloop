@@ -520,3 +520,11 @@
     font-size: 28px;
   }
 }
+
+.import-preview {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.import-preview > * {
+  min-width: 0;
+}

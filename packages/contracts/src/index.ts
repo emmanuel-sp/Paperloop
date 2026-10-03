@@ -229,6 +229,7 @@ export const researchDocumentSchema = z.object({
   extractionError: z.string().nullable(),
   submittedBy: z.enum(['user', 'agent']),
   retrievedAt: z.iso.datetime().nullable(),
+  importNotes: z.array(z.string()).optional(),
   currentBrief: implementationBriefSchema.nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -263,3 +264,35 @@ export type ResearchContentPage = z.infer<typeof researchContentPageSchema>;
 export * from './discovery.js';
 
 export * from './schedules.js';
+
+export const researchImportInputSchema = z
+  .object({
+    input: z.string().trim().max(500_000).default(''),
+    file: z
+      .object({
+        name: nonEmptyText.max(200),
+        contentType: z.string().max(100),
+        data: z.string().max(1_400_000),
+      })
+      .optional(),
+  })
+  .refine(
+    (value) => Boolean(value.input || value.file),
+    'Supply a reference, text, or file.',
+  );
+export const researchImportPreviewSchema = z.object({
+  id: z.uuid(),
+  inputKind: z.enum(['url', 'arxiv', 'doi', 'reference', 'text', 'file']),
+  document: ingestResearchDocumentRequestSchema,
+  notes: z.array(z.string()),
+  duplicateId: z.uuid().nullable(),
+});
+export const researchImportCommitSchema = z.object({
+  previewId: z.uuid(),
+  title: nonEmptyText.max(500).optional(),
+  authors: z.array(nonEmptyText.max(200)).max(100).optional(),
+  extractedContent: z.string().trim().min(1).max(500_000).optional(),
+});
+export type ResearchImportInput = z.infer<typeof researchImportInputSchema>;
+export type ResearchImportPreview = z.infer<typeof researchImportPreviewSchema>;
+export type ResearchImportCommit = z.infer<typeof researchImportCommitSchema>;

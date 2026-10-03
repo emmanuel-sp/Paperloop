@@ -32,3 +32,9 @@ Verification covers global ranking/pagination, all durable states through resubm
 
 
 Phase 3 local validation: build, typecheck, lint, 113 contract/server tests, and all 24 browser tests passed. The final narrow-screen acceptance/rejection rerun also passed. Populated 1440px/390px ranked-feed and decision-history captures were inspected; CI retains them under the foundations artifacts. Review Linux/macOS CI and release smoke on the published current head before merging. With all three phases merged, #39 is ready to close and #40 is the next dependency-ready Research unit.
+
+## Broad import
+
+Import paper accepts a URL, arXiv identifier (including explicit versions), DOI, citation, pasted text, or a PDF/plain-text upload up to 1 MiB. Preview resolves public metadata and text without creating a library record. Review extraction availability, duplicate identity, and uncertainty before saving; optional corrections and pasted fallback text stay secondary. DOI metadata uses Crossref; arXiv uses public metadata plus bounded full-text extraction. No model or paid API is called.
+
+Preview tokens are project-scoped, retained for 15 minutes, and bounded to 32 outstanding previews. Service restart requires another preview. Saving uses canonical library deduplication and retains import notes with the project’s paper. Unsupported files and source failures are shown honestly rather than treated as successfully extracted research.
