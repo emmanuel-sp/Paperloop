@@ -46,6 +46,7 @@ export function SourceWorkspace({ projectId }: { projectId: string }) {
       key={JSON.stringify(current.data.selection)}
       projectId={projectId}
       initial={current.data.selection}
+      suggested={current.data.selectionOrigin === 'suggested'}
       catalog={catalog.data}
     />
   );
@@ -53,10 +54,12 @@ export function SourceWorkspace({ projectId }: { projectId: string }) {
 function SourceEditor({
   projectId,
   initial,
+  suggested,
   catalog,
 }: {
   projectId: string;
   initial: SourceSelection;
+  suggested: boolean;
   catalog: Awaited<ReturnType<typeof sourceCatalog>>;
 }) {
   const [selection, setSelection] = useState(initial);
@@ -105,8 +108,7 @@ function SourceEditor({
         <p className="eyebrow">Research sources</p>
         <h2>Choose what this project follows</h2>
         <p className="muted">
-          Collections group public sources. Save your selections before
-          searching in Research.
+          {suggested ? 'Suggested from project context. Track can use these sources now; save to customize.' : 'Your saved selections apply to this project. Save changes before collecting.'}
         </p>
       </div>
       <fieldset className="source-options">

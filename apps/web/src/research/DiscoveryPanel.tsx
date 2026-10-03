@@ -1,3 +1,4 @@
+import type { ResearchDocument } from '@paperloop/contracts';
 import { Field } from '../components/Field';
 import { AutoTextarea } from '../components/AutoTextarea';
 import { Dialog } from '../components/Dialog';
@@ -15,7 +16,11 @@ import {
   errorMessage,
 } from './discovery-client';
 
-export function DiscoveryPanel({ projectId }: { projectId: string }) {
+export function DiscoveryPanel({ projectId, documents, onSelect }: {
+  projectId: string;
+  documents: ResearchDocument[];
+  onSelect(id: string): void;
+}) {
   const [params, setParams] = useSearchParams();
   const project = useQuery({
     queryKey: ['projects', projectId],
@@ -36,6 +41,7 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
       (previous) => {
         const updated = new URLSearchParams(previous);
         updated.set('angle', angle);
+        updated.delete('recommendationOffset');
         return updated;
       },
       { replace: true },
@@ -57,7 +63,7 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
   };
   const search = useMutation({
     mutationFn: (offsets: Record<string, number>) =>
-      scanSources(projectId, { query, offsets, limit: 10 }),
+      scanSources(projectId, { query, offsets, limit: 10, useSuggestedSources: true }),
     onSuccess: invalidate,
   });
   const fetch = useMutation({
@@ -65,6 +71,7 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
     onSuccess: invalidate,
   });
   const latest = search.data ?? scans.data?.[0];
+  const collected = documents.filter(document => latest?.documentIds.includes(document.id)).slice(0, 10);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!query.trim() || !sources.data?.sources.length || project.isPending || search.isPending) return;
@@ -137,6 +144,7 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
             to start a search.
           </p>
         ) : null}
+        {sources.data?.selectionOrigin === 'suggested' ? <p className="composer-help">Sources suggested from project context. Adjust them in Sources.</p> : null}
         <p className="composer-help">
           Track collects papers once. Ongoing monitoring is not configured by this action.
         </p>
@@ -179,6 +187,18 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
               Papers are ready for assessment. Waiting for a coding agent to
               take the work; collecting papers does not start an agent.
             </p>
+          ) : null}
+          {collected.length ? (
+            <div className="research-list">
+              <h3>Collected papers</h3>
+              <p className="muted">Source material from this collection. Agent recommendations appear above; more saved material is available in Saved research.</p>
+              {collected.map(document => (
+                <button className="research-item" key={document.id} type="button" onClick={() => onSelect(document.id)}>
+                  <span>{document.title}</span>
+                  <small>{document.extractedContentAvailable ? 'Full text available' : 'Metadata collected'} · Open evidence</small>
+                </button>
+              ))}
+            </div>
           ) : null}
           {latest.outcomes.map((item) => (
             <div className="scan-outcome" key={item.sourceId}>

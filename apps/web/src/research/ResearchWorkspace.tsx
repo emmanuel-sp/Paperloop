@@ -130,7 +130,7 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
       >
         <div className="research-stack">
           <RecommendationPanel projectId={projectId} onSelect={setSelectedId} />
-          <DiscoveryPanel projectId={projectId} />
+          <DiscoveryPanel projectId={projectId} documents={documents} onSelect={setSelectedId} />
         </div>
         {selectedId ? (
           <PaperDetail
