@@ -482,3 +482,71 @@ report parsing, serial execution, process stopping, overall bounds, artifact/log
 budgets, coverage semantics, external provenance validation and trustworthy
 aggregate/comparison decisions. Phase D owns the agent-led explanation/correction
 and executable approval workflow; #47/#46 integration follows those phases.
+
+## Phase C1 implementation checkpoint
+
+This bounded unit adds an **internal serial runner** and existing-report readers.
+Public experiment preparation, execution, import, comparison and automation still
+reject format-v2 suites. Phase C2 must connect the engine to those entry points;
+this checkpoint does not make layered Evaluation available in the app or complete
+#66. No new user fields or UI controls were introduced.
+
+The engine accepts an already reserved, running harness attempt with an exact
+approved suite fingerprint. It persists all pending checks before dispatch, writes
+running state before spawning, and confirms the process group has stopped before
+reading evidence or starting another command. It uses the approved executable and
+arguments with `shell: false`, a minimal environment and explicitly approved
+references. There are no installs, inferred commands, per-check retries or paid
+fallbacks. A run ID/artifact directory cannot be reused to resume an attempt.
+Caller authorization is mandatory, checked before dispatch and every 100 ms during
+execution; stored approval and the parent fingerprint are also rechecked. A caller
+must persist the returned parent result, or mark/reconcile an interrupted attempt
+if evidence storage or approval changes prevent completion. This engine does not
+reserve budgets itself and has no public execution endpoint.
+
+JUnit v1 reads repository-produced XML, including nested suites, per-case failures,
+errors and skips. It rejects empty/malformed reports, inconsistent declared totals,
+unsupported explicit statuses/structures, DTD/entity declarations, excessive nesting
+and over-limit evidence. It hashes suite/class/file/name identifiers without using
+report order; duplicate identities remain distinguishable but explicitly ambiguous.
+Ambiguous or skipped coverage is unknown unless the approved skip policy permits
+skips. Metrics-v1 checks registered criteria/units/sample counts; cases-v1 is parsed
+only through an explicitly registered sidecar and must match the approved dataset.
+A plain artifact named `cases.json` remains an artifact. A metric measurement alone
+does not claim case coverage.
+
+Missing, stale, malformed or oversized reports produce unknown evidence. A nonzero
+command exit or retained failing case remains a failure even when other evidence
+is missing. Dependencies run only after prerequisites pass; independent checks
+continue after ordinary check failures or per-check timeouts. Overall timeout,
+cancellation, authorization revocation and unconfirmed process termination stop
+further dispatch. Traversal completion and required-validation success are separate
+facts. Restart recovery preserves terminal results and cases, interrupts unfinished
+checks, and reconstructs the parent summary with known partial case counts; it does
+not resume commands or assert surviving processes have stopped.
+
+Approved report files are removed before each launch and must be newly produced
+within the workspace. Readers reject report/artifact symlinks and nonregular files,
+use bounded no-follow file reads, and reject files changing during a read. Each
+report is limited to 2 MB, each artifact to 10 MB, artifacts to 50 MB per attempt,
+and logs to 10 MB per attempt plus 1 MB per stream/check. Log truncation is explicit.
+Cases retain the existing 10,000/check and 50,000/attempt storage bounds and paged
+read endpoints. Original report bytes are retained before parsing when within bounds.
+Declared additional artifacts may be existing workspace files; their presence does
+not independently establish a test outcome or fresh measurement.
+
+Controlled local tests include 301 cases from Node's actual JUnit reporter,
+dependency failures, command/report disagreement, explicit sidecars, missing/stale/
+malformed/oversized/symlinked evidence, cancellation, per-check/overall timeouts,
+revocation, resistant descendants, unconfirmed termination, log/artifact bounds,
+exact-plan mismatch and legacy compatibility. All measurements use fresh temporary
+fixtures, not the owner's instance or paid execution.
+
+**Next unit: C2.** Integrate experiment workspaces and durable attempt reservation,
+retained automation ceilings, parent completion/cancellation, bounded before/after
+code and observed environment/dataset provenance, external imports and recomputed
+comparable results. Review exact approval/process/budget boundaries before enabling
+v2 execution. Then phase D delivers agent-led suggestions and plain-language
+corrections/review with optional expert editing; #47 presents comparisons and #46
+verifies the complete user flow across viewports. These outstanding requirements
+remain in #66 rather than being claimed complete by this internal engine.

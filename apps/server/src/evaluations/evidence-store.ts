@@ -79,6 +79,18 @@ export class EvaluationEvidenceStore {
       );
     return { run, suite: plan.configuration };
   }
+  requireActiveSuite(runId: string, approvedFingerprint: string): void {
+    const { run } = this.approvedSuite(runId);
+    if (
+      run.status !== 'running' ||
+      run.producer !== 'harness' ||
+      run.planFingerprint !== approvedFingerprint
+    )
+      throw new WorkflowError(
+        'RUN_NOT_ACTIVE',
+        'Execution requires an active reserved harness run with the exact approved suite.',
+      );
+  }
   checks(runId: string): SuiteCheckRecord[] {
     this.parent(runId);
     return this.database.db
@@ -396,6 +408,16 @@ export class EvaluationEvidenceStore {
     // Recovery preserves terminal checks and every case; it never retries a command.
     for (const previous of this.checks(runId)) {
       if (terminal(previous.result.status)) continue;
+      const storedCases = this.database.db
+        .select({ total: count() })
+        .from(evaluationRunCases)
+        .where(
+          and(
+            eq(evaluationRunCases.runId, runId),
+            eq(evaluationRunCases.checkId, previous.result.checkId),
+          ),
+        )
+        .get()!.total;
       const payload: SuiteCheckRecord = {
         ...previous,
         finishedAt,
@@ -405,6 +427,8 @@ export class EvaluationEvidenceStore {
         result: {
           ...previous.result,
           status: 'interrupted',
+          caseCount: storedCases || previous.result.caseCount,
+          caseCoverage: storedCases ? 'partial' : previous.result.caseCoverage,
           reason:
             'Service restarted; reconcile the parent experiment before a new full run.',
         },

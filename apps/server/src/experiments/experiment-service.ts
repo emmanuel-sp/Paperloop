@@ -1,3 +1,4 @@
+import { summarizeSuite } from '../evaluations/suite-summary.js';
 import { EvaluationEvidenceStore } from '../evaluations/evidence-store.js';
 import {
   automationExperiments,
@@ -54,11 +55,24 @@ export class ExperimentService {
         .where(eq(evaluationRuns.status, 'running'))
         .all()) {
         this.evidence.interrupt(row.id, new Date().toISOString());
+        const suiteChecks = this.evidence.checks(row.id);
         tx.update(evaluationRuns)
           .set({
             status: 'interrupted',
             payload: {
               ...row.payload,
+              ...(suiteChecks.length
+                ? {
+                    result: summarizeSuite(suiteChecks),
+                    artifactReferences: [
+                      ...new Set(
+                        suiteChecks.flatMap(
+                          (check) => check.result.artifactReferences,
+                        ),
+                      ),
+                    ],
+                  }
+                : {}),
               status: 'interrupted',
               error:
                 'Service restarted; reconcile the workspace and any surviving processes before retrying.',
