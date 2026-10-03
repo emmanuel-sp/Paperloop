@@ -877,7 +877,7 @@ describe('automation prerequisites and budgets', () => {
     });
     cleanup.push(() => app.close());
     expect(app.database.sqlite.pragma('user_version', { simple: true })).toBe(
-      6,
+      7,
     );
     expect(app.database.backupPath).toBeTruthy();
     const backup = new Database(app.database.backupPath!);

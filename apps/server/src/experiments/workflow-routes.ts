@@ -3,6 +3,9 @@ import {
   evaluationPlanDraftSchema,
   evaluationSuggestionSchema,
   evaluationResultSchema,
+  suiteCasePageRequestSchema,
+  suiteCasePageSchema,
+  suiteCheckListSchema,
   experimentRequestSchema,
   implementationEvidenceSchema,
 } from '@paperloop/contracts';
@@ -17,14 +20,46 @@ export function registerWorkflowRoutes(
   experiments: ExperimentService,
   suggestions: EvaluationSuggestionService,
 ): void {
-  app.get<{ Params: { id: string } }>('/api/v1/projects/:id/evaluation-suggestion', async request => {
-    const query = z.object({ documentId: z.uuid().optional(), recommendationId: z.uuid().optional(), researchAngle: z.string().trim().max(500).optional() }).parse(request.query);
-    return evaluationSuggestionSchema.parse(suggestions.suggest(request.params.id, query.documentId, query.recommendationId, query.researchAngle));
-  });
-  app.post<{ Params: { id: string } }>('/api/v1/projects/:id/evaluation-suggestion', async request => {
-    const input = z.object({ documentId: z.uuid().optional(), recommendationId: z.uuid().optional(), researchAngle: z.string().trim().max(500).optional(), contextVersion: z.number().int().positive() }).parse(request.body);
-    return suggestions.use(request.params.id, input.documentId, input.contextVersion, input.recommendationId, input.researchAngle);
-  });
+  app.get<{ Params: { id: string } }>(
+    '/api/v1/projects/:id/evaluation-suggestion',
+    async (request) => {
+      const query = z
+        .object({
+          documentId: z.uuid().optional(),
+          recommendationId: z.uuid().optional(),
+          researchAngle: z.string().trim().max(500).optional(),
+        })
+        .parse(request.query);
+      return evaluationSuggestionSchema.parse(
+        suggestions.suggest(
+          request.params.id,
+          query.documentId,
+          query.recommendationId,
+          query.researchAngle,
+        ),
+      );
+    },
+  );
+  app.post<{ Params: { id: string } }>(
+    '/api/v1/projects/:id/evaluation-suggestion',
+    async (request) => {
+      const input = z
+        .object({
+          documentId: z.uuid().optional(),
+          recommendationId: z.uuid().optional(),
+          researchAngle: z.string().trim().max(500).optional(),
+          contextVersion: z.number().int().positive(),
+        })
+        .parse(request.body);
+      return suggestions.use(
+        request.params.id,
+        input.documentId,
+        input.contextVersion,
+        input.recommendationId,
+        input.researchAngle,
+      );
+    },
+  );
 
   app.get<{ Params: { id: string } }>(
     '/api/v1/projects/:id/evaluations',
@@ -163,6 +198,33 @@ export function registerWorkflowRoutes(
   );
   app.get<{ Params: { id: string } }>('/api/v1/runs/:id', async (request) =>
     experiments.run(request.params.id),
+  );
+  app.get<{ Params: { id: string } }>(
+    '/api/v1/runs/:id/checks',
+    async (request) =>
+      suiteCheckListSchema.parse({
+        checks: experiments.evidence.checks(request.params.id),
+      }),
+  );
+  app.get<{ Params: { id: string; checkId: string } }>(
+    '/api/v1/runs/:id/checks/:checkId/cases',
+    async (request) => {
+      const query = z
+        .object({
+          cursor: z.string().max(2048).optional(),
+          status: suiteCasePageRequestSchema.shape.status,
+          limit: z.coerce.number().int().min(1).max(100).default(100),
+        })
+        .strict()
+        .parse(request.query);
+      return suiteCasePageSchema.parse(
+        experiments.evidence.cases(
+          request.params.id,
+          request.params.checkId,
+          query,
+        ),
+      );
+    },
   );
   app.post<{ Params: { id: string } }>(
     '/api/v1/runs/:id/cancel',

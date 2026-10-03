@@ -2,6 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { desc, eq } from 'drizzle-orm';
 import {
   evaluationPlanDraftSchema,
+  isEvaluationSuite,
+  freezeEvaluationConfiguration,
+  type LegacyEvaluationPlanDraft,
   type EvaluationPlan,
   type EvaluationPlanDraft,
 } from '@paperloop/contracts';
@@ -19,7 +22,24 @@ export class WorkflowError extends Error {
   }
 }
 export function fingerprint(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  const serialized =
+    value &&
+    typeof value === 'object' &&
+    'formatVersion' in value &&
+    value.formatVersion === 2
+      ? JSON.stringify(canonical(value))
+      : JSON.stringify(value);
+  return createHash('sha256').update(serialized).digest('hex');
+}
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object')
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([key, child]) => [key, canonical(child)]),
+    );
+  return value;
 }
 export class PlanService {
   constructor(
@@ -51,7 +71,10 @@ export class PlanService {
   }
   draft(projectId: string, input: EvaluationPlanDraft): EvaluationPlan {
     this.projects.get(projectId);
-    const configuration = evaluationPlanDraftSchema.parse(input);
+    const parsed = evaluationPlanDraftSchema.parse(input);
+    const configuration = isEvaluationSuite(parsed)
+      ? freezeEvaluationConfiguration(parsed)
+      : parsed;
     const plan = this.database.db.transaction((tx) => {
       const latest = tx
         .select()
@@ -75,7 +98,10 @@ export class PlanService {
   }
   approve(id: string, expectedFingerprint: string): EvaluationPlan {
     const plan = this.get(id);
-    if (plan.fingerprint !== expectedFingerprint)
+    if (
+      plan.fingerprint !== expectedFingerprint ||
+      plan.fingerprint !== fingerprint(plan.configuration)
+    )
       throw new WorkflowError(
         'PLAN_CHANGED',
         'Review the exact plan version before approving.',
@@ -86,6 +112,17 @@ export class PlanService {
       .where(eq(evaluationPlans.id, id))
       .run();
     return this.get(id);
+  }
+  requireExecutable(
+    id: string,
+  ): EvaluationPlan & { configuration: LegacyEvaluationPlanDraft } {
+    const plan = this.requireApproved(id);
+    if (isEvaluationSuite(plan.configuration))
+      throw new WorkflowError(
+        'SUITE_EXECUTION_UNAVAILABLE',
+        'Layered Evaluation execution is not available yet. Keep this suite for review; use an approved single-command Evaluation to run an experiment.',
+      );
+    return { ...plan, configuration: plan.configuration };
   }
   requireApproved(id: string): EvaluationPlan {
     const plan = this.get(id);

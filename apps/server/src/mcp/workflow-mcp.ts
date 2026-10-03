@@ -11,6 +11,9 @@ import {
   runSchema,
   comparisonSchema,
   artifactContentSchema,
+  suiteCheckListSchema,
+  suiteCasePageSchema,
+  suiteCasePageRequestSchema,
 } from '@paperloop/contracts';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { PlanService } from '../evaluations/plan-service.js';
@@ -25,6 +28,8 @@ export function registerWorkflowMcp(
   const experiment = z.object({ experimentId: z.uuid() });
   const run = z.object({ runId: z.uuid() });
   const outputs: Record<string, z.ZodObject> = {
+    evaluations_run_checks: suiteCheckListSchema,
+    evaluations_run_cases: suiteCasePageSchema,
     evaluations_list: evaluationPlanListSchema,
     evaluations_draft: evaluationPlanSchema,
     evaluations_get: evaluationPlanSchema,
@@ -162,6 +167,24 @@ export function registerWorkflowMcp(
     'Poll execution state and structured evidence.',
     run,
     ({ runId }) => experiments.run(runId),
+    true,
+  );
+  tool(
+    'evaluations_run_checks',
+    'Read durable check specifications, status, and evidence. Legacy runs return no structured checks.',
+    run,
+    ({ runId }) => ({ checks: experiments.evidence.checks(runId) }),
+    true,
+  );
+  tool(
+    'evaluations_run_cases',
+    'Read at most 100 stored cases for a check; preserve run/check/filter when using the next cursor.',
+    run.extend({
+      checkId: z.string().min(1).max(80),
+      ...suiteCasePageRequestSchema.shape,
+    }),
+    ({ runId, checkId, ...query }) =>
+      experiments.evidence.cases(runId, checkId, query),
     true,
   );
   tool(

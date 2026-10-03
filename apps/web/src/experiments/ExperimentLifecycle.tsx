@@ -1,3 +1,4 @@
+import { isEvaluationSuite } from '@paperloop/contracts';
 import { Link } from 'react-router';
 import { useState } from 'react';
 import type { ExperimentDetail, ResearchDocument } from '@paperloop/contracts';
@@ -155,7 +156,7 @@ Then evaluate the candidate with the approved configuration and review compatibl
         </p>
         <p>Dataset: {plan.configuration.datasetIdentity}</p>
         <ul>
-          {plan.configuration.metrics.map((metric) => (
+          {(isEvaluationSuite(plan.configuration) ? plan.configuration.checks.flatMap(check => check.metrics) : plan.configuration.metrics).map((metric) => (
             <li key={metric.name}>
               {metric.name} · {metric.unit} ·{' '}
               {metric.guardrail ? 'regression guardrail' : 'primary metric'} ·

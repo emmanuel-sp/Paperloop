@@ -7,7 +7,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
-  evaluationPlanDraftSchema,
+  legacyEvaluationPlanDraftSchema as evaluationPlanDraftSchema,
   ingestResearchDocumentRequestSchema,
   type EvaluationRun,
 } from '@paperloop/contracts';
@@ -299,7 +299,7 @@ describe('milestone 2 experiment loop', () => {
       app.experiments.startRun(id, 'baseline').id,
     );
     expect(baseline.status).toBe('completed');
-    expect(baseline.result?.metrics[0]?.value).toBe(10);
+    expect((baseline.result?.schemaVersion === 1 ? baseline.result.metrics[0]?.value : undefined)).toBe(10);
     const claimed = await client.callTool({
       name: 'experiments_claim',
       arguments: { experimentId: id, owner: 'test-agent' },
@@ -491,7 +491,7 @@ describe('milestone 2 experiment loop', () => {
       app,
       app.experiments.startRun(detail.experiment.id, 'baseline').id,
     );
-    expect(run.result?.metrics[0]?.value).toBe(8);
+    expect((run.result?.schemaVersion === 1 ? run.result.metrics[0]?.value : undefined)).toBe(8);
     expect(readFileSync(join(repository, 'score.txt'), 'utf8')).toBe('10');
   });
 

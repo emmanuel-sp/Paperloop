@@ -7,6 +7,7 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   evaluationPlanListSchema,
+  isEvaluationSuite,
   experimentListSchema,
   artifactContentSchema,
   experimentDetailSchema,
@@ -55,7 +56,7 @@ export function ExperimentWorkspace({
         await request(`/api/v1/projects/${projectId}/evaluations`),
       ).plans,
   });
-  const selectedPlanId = planId || params.get('plan') || plans.data?.find(plan => plan.approvedAt)?.id || '';
+  const selectedPlanId = planId || params.get('plan') || plans.data?.find(plan => plan.approvedAt && !isEvaluationSuite(plan.configuration))?.id || '';
   const experiments = useQuery({
     queryKey: ['experiments', projectId],
     queryFn: async () =>
@@ -158,7 +159,7 @@ export function ExperimentWorkspace({
           <p className="muted">
             Test a paper in an isolated copy of your project.
           </p>
-          {!plans.isPending && !plans.data?.some((plan) => plan.approvedAt) ? (
+          {!plans.isPending && !plans.data?.some((plan) => plan.approvedAt && !isEvaluationSuite(plan.configuration)) ? (
             <p className="workflow-notice">
               Approve an evaluation before preparing work.{' '}
               <Link
@@ -199,7 +200,7 @@ export function ExperimentWorkspace({
               >
                 <option value="">Choose plan</option>
                 {plans.data
-                  ?.filter((plan) => plan.approvedAt)
+                  ?.filter((plan) => plan.approvedAt && !isEvaluationSuite(plan.configuration))
                   .map((plan) => (
                     <option key={plan.id} value={plan.id}>
                       {plan.configuration.name} v{plan.version}
@@ -221,7 +222,7 @@ export function ExperimentWorkspace({
             <button
               disabled={
                 mutation.isPending ||
-                (!contextualPaper || !plans.data?.some((plan) => plan.approvedAt && plan.id === selectedPlanId))
+                (!contextualPaper || !plans.data?.some((plan) => plan.approvedAt && !isEvaluationSuite(plan.configuration) && plan.id === selectedPlanId))
               }
               className="button primary"
             >
@@ -560,7 +561,7 @@ export function ExperimentWorkspace({
                     <p>Plan fingerprint: {run.planFingerprint}</p>
                   </details>
                   {run.error ? <p className="form-error">{run.error}</p> : null}
-                  {run.result?.metrics.map((metric) => (
+                  {(run.result?.schemaVersion === 1 ? run.result.metrics : []).map((metric) => (
                     <p key={metric.name}>
                       {metric.name}: {metric.value} {metric.unit}
                     </p>

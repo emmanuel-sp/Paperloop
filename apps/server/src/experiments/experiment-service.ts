@@ -1,3 +1,4 @@
+import { EvaluationEvidenceStore } from '../evaluations/evidence-store.js';
 import {
   automationExperiments,
   automationRules,
@@ -37,6 +38,7 @@ import {
 } from './workspaces.js';
 
 export class ExperimentService {
+  readonly evidence: EvaluationEvidenceStore;
   private readonly active = new Map<string, Execution>();
   constructor(
     private readonly database: PaperloopDatabase,
@@ -44,12 +46,14 @@ export class ExperimentService {
     private readonly research: ResearchService,
     private readonly plans: PlanService,
   ) {
+    this.evidence = new EvaluationEvidenceStore(database);
     this.database.db.transaction((tx) => {
       for (const row of tx
         .select()
         .from(evaluationRuns)
         .where(eq(evaluationRuns.status, 'running'))
         .all()) {
+        this.evidence.interrupt(row.id, new Date().toISOString());
         tx.update(evaluationRuns)
           .set({
             status: 'interrupted',
@@ -192,7 +196,7 @@ export class ExperimentService {
       const recommendation = this.database.db.select().from(researchRecommendations).where(and(eq(researchRecommendations.id, input.recommendationId), eq(researchRecommendations.projectId, projectId))).get()?.payload;
       if (!recommendation || recommendation.documentId !== paper.id || recommendation.proposal.projectContextVersion !== project.currentContext.version) throw new WorkflowError('RESEARCH_CONTEXT_CHANGED', 'The recommendation is unavailable or stale. Reassess it in Research before implementation.');
     }
-    const plan = this.plans.requireApproved(input.planId);
+    const plan = this.plans.requireExecutable(input.planId);
     if (plan.projectId !== projectId)
       throw new WorkflowError(
         'WRONG_PROJECT',
@@ -398,7 +402,7 @@ export class ExperimentService {
   startRun(id: string, role: 'baseline' | 'candidate'): EvaluationRun {
     this.checkAutomationBudget(id);
     const experiment = this.get(id);
-    const plan = this.plans.requireApproved(experiment.planId);
+    const plan = this.plans.requireExecutable(experiment.planId);
     if (
       experiment.status === 'claimed' &&
       Date.parse(experiment.claimExpiresAt ?? '') <= Date.now()
@@ -522,9 +526,10 @@ export class ExperimentService {
     input: EvaluationResult,
   ): EvaluationRun {
     const experiment = this.get(id);
-    const plan = this.plans.requireApproved(experiment.planId);
+    const plan = this.plans.requireExecutable(experiment.planId);
     this.checkAutomationBudget(id);
     const result = evaluationResultSchema.parse(input);
+    if (result.schemaVersion !== 1) throw new WorkflowError('RESULT_VERSION_MISMATCH', 'A single-command Evaluation requires schemaVersion 1 evidence.');
     const run: EvaluationRun = {
       id: randomUUID(),
       experimentId: id,
@@ -598,7 +603,7 @@ export class ExperimentService {
   }
   compare(id: string, baselineId: string, candidateId: string): Comparison {
     const experiment = this.get(id);
-    const plan = this.plans.requireApproved(experiment.planId);
+    const plan = this.plans.requireExecutable(experiment.planId);
     const baseline = this.run(baselineId);
     const candidate = this.run(candidateId);
     if (['claimed', 'interrupted'].includes(experiment.status))
@@ -643,11 +648,14 @@ export class ExperimentService {
       reasons.push('Result producer identities are incompatible.');
     let improved = false;
     let regressed = false;
+    if (baseline.result?.schemaVersion === 2 || candidate.result?.schemaVersion === 2) throw new WorkflowError('RESULT_VERSION_MISMATCH', 'A single-command Evaluation requires schemaVersion 1 evidence.');
+    const baselineResult = baseline.result;
+    const candidateResult = candidate.result;
     const metrics = plan.configuration.metrics.map((criterion) => {
-      const a = baseline.result?.metrics.find(
+      const a = baselineResult?.metrics.find(
         (metric) => metric.name === criterion.name,
       );
-      const b = candidate.result?.metrics.find(
+      const b = candidateResult?.metrics.find(
         (metric) => metric.name === criterion.name,
       );
       const compatible =

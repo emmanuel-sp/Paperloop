@@ -6,6 +6,8 @@ import {
 } from 'drizzle-orm/sqlite-core';
 import type {
   EvaluationPlanDraft,
+  SuiteCheckRecord,
+  SuiteCase,
   Experiment,
   EvaluationRun,
   Comparison,
@@ -356,5 +358,48 @@ export const apiActivations = sqliteTable(
   },
   (table) => [
     uniqueIndex('api_activation_unique').on(table.projectId, table.provider),
+  ],
+);
+
+export const evaluationRunChecks = sqliteTable(
+  'evaluation_run_checks',
+  {
+    runId: text('run_id')
+      .notNull()
+      .references(() => evaluationRuns.id, { onDelete: 'cascade' }),
+    checkId: text('check_id').notNull(),
+    ordinal: integer('ordinal').notNull(),
+    payload: text('payload', { mode: 'json' })
+      .$type<SuiteCheckRecord>()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('run_check_unique').on(table.runId, table.checkId),
+    uniqueIndex('run_check_ordinal_unique').on(table.runId, table.ordinal),
+  ],
+);
+export const evaluationRunCases = sqliteTable(
+  'evaluation_run_cases',
+  {
+    runId: text('run_id')
+      .notNull()
+      .references(() => evaluationRuns.id, { onDelete: 'cascade' }),
+    checkId: text('check_id').notNull(),
+    ordinal: integer('ordinal').notNull(),
+    caseId: text('case_id').notNull(),
+    status: text('status').notNull(),
+    payload: text('payload', { mode: 'json' }).$type<SuiteCase>().notNull(),
+  },
+  (table) => [
+    uniqueIndex('run_check_case_unique').on(
+      table.runId,
+      table.checkId,
+      table.caseId,
+    ),
+    uniqueIndex('run_check_case_ordinal_unique').on(
+      table.runId,
+      table.checkId,
+      table.ordinal,
+    ),
   ],
 );
