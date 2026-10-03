@@ -476,6 +476,9 @@ test('populated section progress reports service work before agent activity', as
     await page.screenshot({ path: 'test-results/foundations/discovery-working.png', fullPage: true });
   } finally { release(); }
   await expect(page.getByRole('status').filter({ hasText: 'Waiting for a coding agent to take the work' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Collected papers', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /A focused retrieval technique.*Open evidence/ }).click();
+  await expect(page).toHaveURL(new RegExp(`paper=${fixture.paperId}`));
   await page.screenshot({ path: 'test-results/foundations/discovery-waiting.png', fullPage: true });
   documentIds = [];
   await page.getByRole('button', { name: 'Track', exact: true }).click();
@@ -796,9 +799,9 @@ test('inferred research angle can be corrected and Track reports one-off collect
   const angle = page.getByLabel('Research angle', { exact: true });
   await expect(angle).toHaveValue('Improve answer grounding');
   await expect(page.getByText('Track collects papers once.', { exact: false })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Track', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Track', exact: true })).toBeEnabled();
   await angle.fill('Reduce retrieval latency');
-  await page.getByRole('link', { name: '0 research sources', exact: true }).click();
+  await page.getByRole('link', { name: '2 research sources', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Research sources', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close Research sources' }).click();
   await expect(angle).toHaveValue('Reduce retrieval latency');
@@ -856,4 +859,95 @@ test('Research prefers saved onboarding direction and falls back to description 
   await page.route(`**/api/v1/projects/${projectId}`, route => route.fulfill({ json: { ...project, objectives: [] } }));
   await page.reload();
   await expect(page.getByLabel('Research angle', { exact: true })).toHaveValue(project.description);
+});
+
+test('ranked findings retain accept/reject decisions and open contextual preparation without approval', async ({ page }) => {
+  await connect(page);
+  const created = await page.request.post('/api/v1/projects', { data: {
+    name: 'Feed review fixture', description: 'Improve retrieval latency and recall.', objectives: ['Retrieval latency recall'], constraints: [],
+  } });
+  expect(created.ok()).toBe(true);
+  const project = await created.json();
+  const base = `/projects/${project.id}`;
+  const make = async (title: string, relevant: boolean) => {
+    const paper = await page.request.post(`/api/v1/projects/${project.id}/research`, { data: {
+      title, sourceKind: 'reference', sourceReference: title, authors: [], extractionStatus: 'pending', submittedBy: 'agent',
+    } });
+    const document = await paper.json();
+    const proposal = {
+      documentId: document.id, title,
+      summary: relevant ? 'A retrieval change to measure against current latency.' : 'A compression technique.',
+      applicability: relevant ? 'Retrieval latency recall matches the project objective.' : 'Archive size savings.',
+      prerequisites: [], uncertainty: 'Synthetic fixture, not measured project evidence.',
+      evaluationTargets: [relevant ? 'Retrieval latency recall' : 'Archive bytes'],
+      sources: [{ documentId: document.id, claim: 'Source reports a possible improvement.', evidence: 'Synthetic citation for browser verification.' }], projectContextVersion: 1,
+    };
+    const response = await page.request.post(`/api/v1/projects/${project.id}/recommendations`, { data: proposal });
+    expect(response.ok()).toBe(true);
+    return { recommendation: await response.json(), proposal, document };
+  };
+  const high = await make('Retrieval latency candidate', true);
+  const low = await make('Compression candidate', false);
+  await page.goto(`${base}/research`);
+  const cards = page.locator('.recommendation-card');
+  await expect(cards.first().getByRole('heading', { level: 3 })).toHaveText('Retrieval latency candidate');
+  await expect(cards.first().getByText('Text matches:', { exact: false })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: 'test-results/foundations/ranked-feed-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/foundations/ranked-feed-mobile.png', fullPage: true });
+  await expect(page.getByRole('button', { name: 'Track', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Sources', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Research sources', exact: true }).getByText('Suggested from project context.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: /Retrieval Search/ })).toBeChecked();
+  await page.getByRole('button', { name: 'Close Research sources' }).click();
+  const highCard = cards.filter({ hasText: 'Retrieval latency candidate' });
+  await highCard.getByText('Decision note (optional)', { exact: true }).click();
+  await highCard.getByLabel('Decision note', { exact: true }).fill('Measure on the project before implementation');
+  await page.route(`**/recommendations/${high.recommendation.id}`, route => route.fulfill({ status: 503, json: { message: 'Controlled decision failure' } }));
+  await highCard.getByRole('button', { name: 'Accept & prepare', exact: true }).click();
+  await expect(highCard.getByRole('alert')).toContainText('Controlled decision failure');
+  await expect(highCard.getByLabel('Decision note', { exact: true })).toHaveValue('Measure on the project before implementation');
+  await expect(page).toHaveURL(/\/research$/);
+  await page.unroute(`**/recommendations/${high.recommendation.id}`);
+  await highCard.getByRole('button', { name: 'Accept & prepare', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Prepare experiment', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`paper=${high.document.id}`));
+  await expect(page.getByRole('combobox', { name: 'Paper', exact: true })).toHaveValue(high.document.id);
+  await expect(page.getByText('Approve an evaluation before preparing work.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Prepare experiment', exact: true })).toBeDisabled();
+  await page.goto(`${base}/research`);
+  await expect(cards).toHaveCount(1);
+  await cards.getByRole('button', { name: 'Reject', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No new recommendations', exact: true })).toBeVisible();
+  // Repeat agent submissions for the same documents; durable decisions must survive.
+  for (const item of [high, low]) {
+    const response = await page.request.post(`/api/v1/projects/${project.id}/recommendations`, { data: item.proposal });
+    expect(response.ok()).toBe(true);
+  }
+  await page.reload();
+  await expect(cards).toHaveCount(0);
+  await page.getByRole('button', { name: 'Past decisions & context', exact: true }).click();
+  await expect(cards).toHaveCount(2);
+  await expect(cards.filter({ hasText: 'Retrieval latency candidate' })).toContainText('Accepted');
+  await expect(cards.filter({ hasText: 'Compression candidate' })).toContainText('Rejected');
+  await page.reload();
+  await expect(cards).toHaveCount(2);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/foundations/decisions-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: 'test-results/foundations/decisions-desktop.png', fullPage: true });
+  await page.request.patch(`/api/v1/projects/${project.id}`, { data: { description: 'Changed context' } });
+  await page.reload();
+  await expect(cards.first().getByText('Project context has changed.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Continue preparation' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'New findings', exact: true }).click();
+  await expect(cards).toHaveCount(0);
+  // A deliberate empty source selection is distinct from an unconfigured project.
+  await page.request.put(`/api/v1/projects/${project.id}/sources`, { data: {} });
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Track', exact: true })).toBeDisabled();
+  await expect(page.getByRole('link', { name: '0 research sources', exact: true })).toBeVisible();
 });

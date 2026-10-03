@@ -1,6 +1,7 @@
+import { Field } from '../components/Field';
 import { AutoTextarea } from '../components/AutoTextarea';
 import { useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Recommendation,
@@ -21,6 +22,8 @@ export function RecommendationPanel({
   onSelect(id: string): void;
 }) {
   const [params, setParams] = useSearchParams();
+  const view = params.get('decisions') === 'history' ? 'history' : 'actionable';
+  const angle = params.get('angle') ?? '';
   const requestedOffset = Number(params.get('recommendationOffset') ?? 0);
   const offset =
     Number.isInteger(requestedOffset) &&
@@ -35,19 +38,29 @@ export function RecommendationPanel({
       return updated;
     });
   const query = useQuery({
-    queryKey: ['projects', projectId, 'recommendations', offset],
-    queryFn: () => listRecommendations(projectId, offset),
+    queryKey: ['projects', projectId, 'recommendations', view, angle, offset],
+    queryFn: () => listRecommendations(projectId, offset, view, angle),
   });
   return (
     <section className="recommendation-panel research-stack">
       <div>
         <p className="eyebrow">Agent proposals</p>
-        <h2>Ideas to build on.</h2>
+        <h2>{view === 'history' ? 'Past decisions & context' : 'Ideas to build on.'}</h2>
+        <p className="muted">Current-context ideas are ordered by text overlap with your angle and project goals. Agent applicability still needs review.</p>
+        <button className="button tertiary" type="button" onClick={() => setParams(previous => {
+          const updated = new URLSearchParams(previous);
+          if (view === 'actionable') updated.set('decisions', 'history');
+          else updated.delete('decisions');
+          updated.delete('recommendationOffset');
+          return updated;
+        })}>
+          {view === 'actionable' ? 'Past decisions & context' : 'New findings'}
+        </button>
       </div>
       {query.isPending ? (
         <p role="status">Loading recommendations…</p>
       ) : query.isError ? (
-        <p role="alert">{errorMessage(query.error)}</p>
+        <p role="alert">{errorMessage(query.error)} <button className="button" type="button" onClick={() => void query.refetch()}>Retry recommendations</button></p>
       ) : query.data.length ? (
         query.data.map((item) => (
           <RecommendationCard
@@ -58,10 +71,9 @@ export function RecommendationPanel({
         ))
       ) : (
         <div className="empty-inline">
-          <h3>No recommendations yet</h3>
+          <h3>{view === 'history' ? 'No past decisions' : 'No new recommendations'}</h3>
           <p>
-            Ask your connected agent to assess the papers in your library
-            against this project’s objectives.
+            {view === 'history' ? 'Accepted, rejected, tested and older-context ideas remain here for review.' : 'Collect papers below and ask your coding agent to assess them. Accepted, rejected and tested ideas stay in past decisions.'}
           </p>
         </div>
       )}
@@ -94,11 +106,15 @@ function RecommendationCard({
   onSelect(id: string): void;
 }) {
   const [reason, setReason] = useState(item.reason);
+  const navigate = useNavigate();
+  const current = item.relevance?.contextCurrent ?? true;
+  const preparation = `/projects/${item.projectId}/experiments?view=prepare&paper=${item.documentId}&recommendation=${item.id}`;
   const client = useQueryClient();
   const triage = useMutation({
     mutationFn: (state: TriageRecommendationRequest['state']) =>
       triageRecommendation(item.projectId, item.id, { state, reason }),
-    onSuccess: async () => {
+    onSuccess: async (updated) => {
+      if (updated.state === 'saved') navigate(preparation);
       await client.invalidateQueries({
         queryKey: ['projects', item.projectId, 'recommendations'],
       });
@@ -109,7 +125,7 @@ function RecommendationCard({
       <div>
         <h3>{item.proposal.title}</h3>
         <small>
-          {item.state} · revision {item.revision} · context v
+          {{ new: current ? 'New finding' : 'Needs reassessment', saved: 'Accepted', dismissed: 'Rejected', tested: 'Tested' }[item.state]} · revision {item.revision} · context v
           {item.proposal.projectContextVersion}
         </small>
       </div>
@@ -117,6 +133,14 @@ function RecommendationCard({
       <div>
         <h4>Applicability</h4>
         <p>{item.proposal.applicability}</p>
+      </div>
+      <div>
+        <h4>Research evidence</h4>
+        <p>{item.proposal.sources[0]?.claim}</p>
+        <small className="muted">{item.proposal.sources[0]?.evidence}</small>
+        <p className="muted">Source claims are separate from measured project results.</p>
+        {item.relevance?.matchedTerms.length ? <small>Text matches: {item.relevance.matchedTerms.join(', ')}</small> : null}
+        {!current ? <p role="status">Project context has changed. Ask your agent to reassess applicability before preparing an experiment.</p> : null}
       </div>
       <details>
         <summary>Evidence, prerequisites & evaluation targets</summary>
@@ -163,38 +187,36 @@ function RecommendationCard({
           ))}
         </div>
       </details>
-      <label>
-        Decision note
-        <AutoTextarea
-          autoComplete="off"
-          className="decision-note"
-          name="decisionNote"
-          rows={1}
-          placeholder="Why save or dismiss this idea?"
-          maxLength={2000}
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-        />
-      </label>
+      <details>
+        <summary>Decision note (optional)</summary>
+        <Field label="Decision note">
+          {(attributes) => (
+            <AutoTextarea
+              {...attributes}
+              autoComplete="off"
+              className="decision-note"
+              name="decisionNote"
+              rows={1}
+              placeholder="Why accept or reject this idea?"
+              maxLength={2000}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+            />
+          )}
+        </Field>
+      </details>
       <div className="form-actions">
-        {(['saved', 'dismissed', 'new'] as const).map((state) => (
-          <button
-            className="button"
-            disabled={triage.isPending}
-            key={state}
-            type="button"
-            onClick={() => triage.mutate(state)}
-          >
-            {
-              {
-                saved: 'Save',
-                dismissed: 'Dismiss',
-                tested: 'Mark tested',
-                new: 'Reopen',
-              }[state]
-            }
-          </button>
-        ))}
+        {item.state === 'new' && current ? (
+          <>
+            <button className="button primary" disabled={triage.isPending} type="button" onClick={() => triage.mutate('saved')}>
+              {triage.isPending ? 'Saving decision…' : 'Accept & prepare'}
+            </button>
+            <button className="button" disabled={triage.isPending} type="button" onClick={() => triage.mutate('dismissed')}>Reject</button>
+          </>
+        ) : null}
+        {item.experimentId ? <Link className="button" to={`/projects/${item.projectId}/experiments?experiment=${item.experimentId}`}>View experiment evidence</Link> : null}
+        {item.state === 'saved' && current ? <Link className="button" to={preparation}>Continue preparation</Link> : null}
+        {item.state === 'dismissed' && current ? <button className="button" disabled={triage.isPending} type="button" onClick={() => triage.mutate('new')}>Reconsider</button> : null}
         <button
           className="button"
           type="button"

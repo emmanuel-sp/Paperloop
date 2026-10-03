@@ -16,6 +16,7 @@ import {
   recommendationListSchema,
   triageRecommendationRequestSchema,
   triageHistorySchema,
+  recommendationQuerySchema,
   researchDocumentListResponseSchema,
 } from '@paperloop/contracts';
 import type { DiscoveryService } from './discovery-service.js';
@@ -135,12 +136,13 @@ export function registerDiscoveryRoutes(
   app.get<{ Params: ProjectParams }>(
     '/api/v1/projects/:id/recommendations',
     async (request) => {
-      const { offset, limit } = librarySearchRequestSchema.parse(request.query);
+      const { offset, limit, view, query } = recommendationQuerySchema.parse(request.query);
       return recommendationListSchema.parse({
         recommendations: discovery.recommendations(
           request.params.id,
           offset,
           limit,
+          { view, query },
         ),
       });
     },

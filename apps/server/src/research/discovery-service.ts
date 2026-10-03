@@ -49,14 +49,22 @@ export class DiscoveryService {
     return sourceCatalog;
   }
 
-  sources(projectId: string) {
-    this.projects.get(projectId);
-    const selection =
+  sources(projectId: string, suggestDefaults = true) {
+    const project = this.projects.get(projectId);
+    const saved =
       this.database.db
         .select()
         .from(projectSourceSelections)
         .where(eq(projectSourceSelections.projectId, projectId))
-        .get()?.selection ?? sourceSelectionSchema.parse({});
+        .get()?.selection;
+    const context = [project.currentContext.inference?.researchDirection, ...project.objectives, project.description].join(' ').toLowerCase();
+    const collection = /retriev|search|ranking/.test(context) ? 'retrieval'
+      : /agent/.test(context) ? 'agents'
+      : /evaluat|benchmark/.test(context) ? 'evaluation'
+      : /inference|latency|efficien/.test(context) ? 'inference' : undefined;
+    const selection = saved ?? sourceSelectionSchema.parse(
+      !suggestDefaults ? {} : collection ? { collectionIds: [collection] } : { sourceIds: ['arxiv-ai', 'arxiv-ml'] },
+    );
     const ids = new Set([
       ...selection.sourceIds,
       ...sourceCatalog.collections
@@ -79,7 +87,7 @@ export class DiscoveryService {
             'Available feed history (first 200 entries) and locally indexed articles; no complete historical web coverage.',
         });
     }
-    return { selection, sources };
+    return { selection, sources, selectionOrigin: saved ? 'saved' as const : 'suggested' as const };
   }
 
   selectSources(projectId: string, input: SourceSelection) {
@@ -124,7 +132,7 @@ export class DiscoveryService {
     projectId: string,
     input: DiscoverySearchRequest,
   ): Promise<DiscoveryScan> {
-    const { sources } = this.sources(projectId);
+    const { sources } = this.sources(projectId, input.useSuggestedSources ?? false);
     const scan: DiscoveryScan = {
       id: randomUUID(),
       projectId,
@@ -290,22 +298,47 @@ export class DiscoveryService {
     return this.fetchDocument(projectId, document.id);
   }
 
-  recommendations(projectId: string, offset = 0, limit = 100) {
-    this.projects.get(projectId);
+  recommendations(
+    projectId: string,
+    offset = 0,
+    limit = 100,
+    options: { view?: 'all' | 'actionable' | 'history'; query?: string } = {},
+  ) {
+    const project = this.projects.get(projectId);
+    const contextVersion = project.currentContext.version;
+    const terms = Array.from(new Set([
+      options.query,
+      project.currentContext.inference?.researchDirection,
+      ...project.objectives,
+      ...(!project.objectives.length ? [project.description] : []),
+    ].join(' ').toLowerCase().match(/[a-z0-9]{3,}/g) ?? []))
+      .filter((term) => !['the', 'and', 'for', 'with', 'from', 'this', 'that', 'project', 'improve', 'reduce', 'while', 'keeping', 'research'].includes(term))
+      .slice(0, 16);
+    const payload = researchRecommendations.payload;
+    const current = sql`json_extract(${payload}, '$.proposal.projectContextVersion') = ${contextVersion}`;
+    const undecided = sql`json_extract(${payload}, '$.state') = 'new'`;
+    const searchable = sql`lower(json_extract(${payload}, '$.proposal.title') || ' ' || json_extract(${payload}, '$.proposal.summary') || ' ' || json_extract(${payload}, '$.proposal.applicability') || ' ' || json_extract(${payload}, '$.proposal.evaluationTargets'))`;
+    const score = terms.length ? sql.join(terms.map(term => sql`(instr(${searchable}, ${term}) > 0)`), sql` + `) : sql`(0 + 0)`;
+    const view = options.view ?? 'all';
     return this.database.db
       .select()
       .from(researchRecommendations)
-      .where(eq(researchRecommendations.projectId, projectId))
-      .orderBy(
-        desc(
-          sql`json_extract(${researchRecommendations.payload}, '$.updatedAt')`,
-        ),
-        desc(researchRecommendations.id),
-      )
+      .where(and(
+        eq(researchRecommendations.projectId, projectId),
+        view === 'actionable' ? sql`(${current}) AND (${undecided})`
+          : view === 'history' ? sql`NOT ((${current}) AND (${undecided}))` : undefined,
+      ))
+      .orderBy(desc(current), desc(score), desc(sql`json_extract(${payload}, '$.createdAt')`), desc(researchRecommendations.id))
       .limit(limit)
       .offset(offset)
       .all()
-      .map((row) => row.payload);
+      .map(({ payload: item }) => {
+        const text = [item.proposal.title, item.proposal.summary, item.proposal.applicability, JSON.stringify(item.proposal.evaluationTargets)].join(' ').toLowerCase();
+        return { ...item, relevance: {
+          contextCurrent: item.proposal.projectContextVersion === contextVersion,
+          matchedTerms: terms.filter(term => text.includes(term)),
+        } };
+      });
   }
 
   storeRecommendation(

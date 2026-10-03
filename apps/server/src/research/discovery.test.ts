@@ -149,13 +149,68 @@ describe('source discovery and durable analysis', () => {
     const saved = app.discovery.scans(first.id);
     expect(saved).toHaveLength(2);
     const second = project(app);
-    expect(app.discovery.sources(second.id).sources).toEqual([]);
+    expect(app.discovery.sources(second.id).selection.collectionIds).toEqual(['retrieval']);
     expect(() =>
       app.discovery.selectSources(
         second.id,
         sourceSelectionSchema.parse({ collectionIds: ['unknown'] }),
       ),
     ).toThrow('Select collections');
+  });
+
+  it('suggests compact context sources without fetching and preserves explicit empty choices across restart', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'paperloop-source-defaults-'));
+    cleanup.push(() => rmSync(directory, { recursive: true, force: true }));
+    let calls = 0;
+    const first = setup(async () => { calls++; return resource(atom); }, directory);
+    const owner = project(first);
+    expect(first.discovery.sources(owner.id)).toMatchObject({ selectionOrigin: 'suggested', selection: { collectionIds: ['retrieval'] } });
+    expect((await first.discovery.search(owner.id, discoverySearchRequestSchema.parse({}))).outcomes).toHaveLength(0);
+    expect(calls).toBe(0);
+    expect((await first.discovery.search(owner.id, discoverySearchRequestSchema.parse({ useSuggestedSources: true }))).outcomes.length).toBeGreaterThan(0);
+    calls = 0;
+    const generic = first.projects.create({ name: 'Generic', description: 'A software project', objectives: [], constraints: [] });
+    expect(first.discovery.sources(generic.id).selection.sourceIds).toEqual(['arxiv-ai', 'arxiv-ml']);
+    first.discovery.selectSources(owner.id, sourceSelectionSchema.parse({}));
+    expect(first.discovery.sources(owner.id)).toMatchObject({ selectionOrigin: 'saved', sources: [] });
+    expect(calls).toBe(0);
+    await first.close(); cleanup.pop();
+    const second = setup(async () => { calls++; return resource(atom); }, directory);
+    expect(second.discovery.sources(owner.id)).toMatchObject({ selectionOrigin: 'saved', sources: [] });
+    expect(calls).toBe(0);
+  });
+
+  it('ranks the complete feed before paging, isolates durable decisions, and hides stale-context ideas', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'paperloop-feed-'));
+    cleanup.push(() => rmSync(directory, { recursive: true, force: true }));
+    const first = setup(async () => resource(rss), directory);
+    const owner = project(first);
+    const document = (title: string) => first.research.ingest(owner.id, {
+      title, sourceKind: 'reference', sourceReference: title, extractionStatus: 'pending', authors: [], submittedBy: 'agent',
+    });
+    const relevant = document('Retrieval latency');
+    const high = first.discovery.storeRecommendation(owner.id, { ...proposal(relevant.id), title: 'Retrieval latency recall', applicability: 'Retrieval latency and ranking' });
+    for (let i = 0; i < 22; i++) {
+      const low = document(`Unrelated ${i}`);
+      first.discovery.storeRecommendation(owner.id, { ...proposal(low.id), title: 'Compression', summary: 'Compress archives', applicability: 'Archive size', evaluationTargets: ['Storage size'] });
+    }
+    const page = await first.inject({ headers, method: 'GET', url: `/api/v1/projects/${owner.id}/recommendations?view=actionable&query=latency&limit=1` });
+    expect(page.statusCode).toBe(200);
+    expect(page.json().recommendations[0]).toMatchObject({ id: high.id, relevance: { contextCurrent: true, matchedTerms: expect.arrayContaining(['latency', 'retrieval']) } });
+    expect(first.discovery.recommendations(owner.id, 20, 20, { view: 'actionable' })).toHaveLength(3);
+    for (const state of ['saved', 'dismissed', 'tested'] as const) {
+      first.discovery.triage(owner.id, high.id, { state, reason: `Decision ${state}` });
+      first.discovery.storeRecommendation(owner.id, proposal(relevant.id));
+      expect(first.discovery.recommendations(owner.id, 0, 100, { view: 'actionable' }).some(item => item.id === high.id)).toBe(false);
+      expect(first.discovery.recommendations(owner.id, 0, 100, { view: 'history' })[0]).toMatchObject({ state, reason: `Decision ${state}` });
+    }
+    first.projects.update(owner.id, { description: 'Changed project scope' });
+    expect(first.discovery.recommendations(owner.id, 0, 100, { view: 'actionable' })).toHaveLength(0);
+    expect(first.discovery.recommendations(owner.id, 0, 100, { view: 'history' })).toHaveLength(23);
+    await first.close(); cleanup.pop();
+    const second = setup(async () => resource(rss), directory);
+    expect(second.discovery.recommendations(owner.id, 0, 100, { view: 'actionable' })).toHaveLength(0);
+    expect(second.discovery.recommendations(owner.id).find(item => item.id === high.id)).toMatchObject({ state: 'tested', reason: 'Decision tested', relevance: { contextCurrent: false } });
   });
 
   it('honors Retry-After across restart without fetching or paid analysis', async () => {

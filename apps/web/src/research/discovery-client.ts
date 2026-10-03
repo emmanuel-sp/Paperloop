@@ -73,9 +73,9 @@ export async function fetchDocument(id: string, url: string) {
     await request(`${project(id)}/research/fetch`, body('POST', { url })),
   );
 }
-export async function listRecommendations(id: string, offset: number) {
+export async function listRecommendations(id: string, offset: number, view: 'actionable' | 'history' = 'actionable', query = '') {
   return recommendationListSchema.parse(
-    await request(`${project(id)}/recommendations?limit=20&offset=${offset}`),
+    await request(`${project(id)}/recommendations?${new URLSearchParams({ limit: '20', offset: String(offset), view, query })}`),
   ).recommendations;
 }
 export async function triageRecommendation(

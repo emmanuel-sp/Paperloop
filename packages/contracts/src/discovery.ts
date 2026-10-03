@@ -46,10 +46,12 @@ export type SourceSelection = z.infer<typeof sourceSelectionSchema>;
 export const projectSourcesSchema = z.object({
   selection: sourceSelectionSchema,
   sources: z.array(sourceSchema),
+  selectionOrigin: z.enum(['suggested', 'saved']).optional(),
 });
 export const discoverySearchRequestSchema = z
   .object({
     query: z.string().trim().max(500).default(''),
+    useSuggestedSources: z.boolean().optional(),
     limit: z.number().int().min(1).max(25).default(10),
     offsets: z
       .record(z.string(), z.number().int().min(0).max(10000))
@@ -87,6 +89,9 @@ export const librarySearchRequestSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type LibrarySearchRequest = z.infer<typeof librarySearchRequestSchema>;
+export const recommendationQuerySchema = librarySearchRequestSchema.extend({
+  view: z.enum(['all', 'actionable', 'history']).default('all'),
+});
 export const libraryDocumentSchema = z.object({
   id: z.uuid(),
   title: z.string(),
@@ -192,6 +197,10 @@ export const recommendationSchema = z.object({
   experimentId: z.uuid().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  relevance: z.object({
+    contextCurrent: z.boolean(),
+    matchedTerms: z.array(z.string()),
+  }).optional(),
 });
 export type Recommendation = z.infer<typeof recommendationSchema>;
 export const recommendationListSchema = z.object({

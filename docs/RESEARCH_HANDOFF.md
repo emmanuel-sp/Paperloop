@@ -20,3 +20,15 @@ Track performs one collection request through the existing discovery API. The UI
 Validation: build, typecheck, lint and all 23 browser tests passed; new coverage checks objective/inference/description fallback, correction retention through reload and Sources, controlled discovery failure/retry, blank angles and mobile layout. The final submit guard is verified by the focused inference/progress rerun. Populated desktop/mobile `track-{desktop,mobile}.png` captures were inspected locally and are included in CI’s foundations artifacts. Full service/contract and release smoke verification runs in Linux/macOS CI. Review current CI before merging. Keep #39 open and continue compact source defaults and recommendation ranking/triage before #40.
 
 Quota telemetry remains unavailable, so the personal reserve cannot be automatically enforced. This turn remains one bounded phase.
+
+
+## Phase 3: source defaults, relevance and decisions
+
+Branch `codex/research-feed-triage`, based on merged #57. Unconfigured projects expose labeled context-matched source suggestions; saved selections, including empty choices, win. Track explicitly opts into suggestions through `useSuggestedSources`; scheduled/legacy scans default to saved selections. No source read starts fetching. RSS and individual overrides remain secondary.
+
+The recommendation API/MCP accepts `view=all|actionable|history` and ranks the complete set before pagination using bounded lexical overlap with angle/context goals. Responses expose matched terms and current-context status. New findings exclude accepted/rejected/tested and stale-context items; past decisions retain them. Accept saves existing `saved` triage before contextual preparation, Reject stores `dismissed`. Stale ideas ask for reassessment; exact Evaluation approval still governs preparation. Notes are optional and failures retain them. Collected-paper previews open evidence in the same Research page.
+
+Verification covers global ranking/pagination, all durable states through resubmission and restart, context changes, default source opt-in and explicit empty selections, real browser acceptance/rejection and approval-required preparation, failed decision notes, and populated desktop/mobile decision history. Persistent monitoring remains #50; automatic Evaluation remains #41. Continue #40 after #39 acceptance and CI are complete. Quota telemetry remains unavailable; no reserve reading is claimed.
+
+
+Phase 3 local validation: build, typecheck, lint, 113 contract/server tests, and all 24 browser tests passed. The final narrow-screen acceptance/rejection rerun also passed. Populated 1440px/390px ranked-feed and decision-history captures were inspected; CI retains them under the foundations artifacts. Review Linux/macOS CI and release smoke on the published current head before merging. With all three phases merged, #39 is ready to close and #40 is the next dependency-ready Research unit.
