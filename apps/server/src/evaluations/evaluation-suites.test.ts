@@ -175,8 +175,12 @@ describe('suite storage and compatibility boundaries', () => {
     app.plans.approve(legacy.id, legacy.fingerprint);
     expect(Object.isFrozen(plan.configuration)).toBe(true);
     const reorderedInput = example();
-    reorderedInput.checks[0].command = Object.fromEntries(Object.entries(reorderedInput.checks[0].command).reverse());
-    const reordered = Object.fromEntries(Object.entries(reorderedInput).reverse());
+    reorderedInput.checks[0].command = Object.fromEntries(
+      Object.entries(reorderedInput.checks[0].command).reverse(),
+    );
+    const reordered = Object.fromEntries(
+      Object.entries(reorderedInput).reverse(),
+    );
     expect(fingerprint(reordered)).toBe(fingerprint(example()));
     const changed = example();
     changed.checks[0].command.arguments.push('extra');
@@ -477,7 +481,18 @@ describe('suite storage and compatibility boundaries', () => {
       storage: { dataDirectory },
     });
     cleanup.push(() => reopened.close());
-    expect(reopened.experiments.run(run.id).status).toBe('interrupted');
+    expect(reopened.experiments.run(run.id)).toMatchObject({
+      status: 'interrupted',
+      result: {
+        schemaVersion: 2,
+        requiredValidation: 'unknown',
+        checks: [
+          { status: 'passed' },
+          { status: 'interrupted', caseCount: 20, caseCoverage: 'partial' },
+          { status: 'interrupted' },
+        ],
+      },
+    });
     expect(
       reopened.experiments.evidence
         .checks(run.id)
