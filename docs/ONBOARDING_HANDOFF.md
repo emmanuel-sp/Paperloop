@@ -31,4 +31,4 @@ Local verification covers 110 service tests, the contract test, the 21 browser w
 
 After #37 is verified and merged, continue #39's unified Research feed before #40's broad import, following #34's dependency order. The Research work should consume persisted inferred direction/context, retain triage, and keep execution/tracking status truthful. Draft Evaluation approval remains the separate #41 phase.
 
-GitHub Project #2 is inaccessible to this integration (`Resource not accessible by integration`); issue dependencies and #34 provide the available queue. Current quota telemetry is unavailable, so the requested 10% personal usage reserve cannot be enforced automatically. This manually requested run takes one bounded phase and creates no development schedule.
+GitHub Project #2 is inaccessible to this integration (`Resource not accessible by integration`); issue dependencies and #34 provide the available queue. This manually requested run takes one bounded phase and creates no development schedule.
