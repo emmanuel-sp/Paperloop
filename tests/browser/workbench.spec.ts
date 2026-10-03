@@ -468,8 +468,8 @@ test('populated section progress reports service work before agent activity', as
     } });
   });
   await page.goto(`${base}/research`);
-  await page.getByLabel('Research question').fill('retrieval');
-  await page.getByRole('button', { name: 'Search sources', exact: true }).click();
+  await page.getByLabel('Research angle').fill('retrieval');
+  await page.getByRole('button', { name: 'Track', exact: true }).click();
   try {
     await expect(page.getByRole('status').filter({ hasText: 'Agent analysis has not started.' })).toBeVisible();
     await expect(page.getByText('Agent working', { exact: true })).toHaveCount(0);
@@ -478,7 +478,7 @@ test('populated section progress reports service work before agent activity', as
   await expect(page.getByRole('status').filter({ hasText: 'Waiting for a coding agent to take the work' })).toBeVisible();
   await page.screenshot({ path: 'test-results/foundations/discovery-waiting.png', fullPage: true });
   documentIds = [];
-  await page.getByRole('button', { name: 'Search sources', exact: true }).click();
+  await page.getByRole('button', { name: 'Track', exact: true }).click();
   await expect(page.getByText('No papers to assess', { exact: true })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Waiting for a coding agent to take the work' })).toHaveCount(0);
 
@@ -563,7 +563,7 @@ test('research composer grows with a draft and supports focused URL import', asy
 }) => {
   await connect(page);
   await page.getByRole('link', { name: 'Research', exact: true }).click();
-  const composer = page.getByLabel('Research question', { exact: true });
+  const composer = page.getByLabel('Research angle', { exact: true });
   const originalHeight = await composer.evaluate(
     (element) => element.clientHeight,
   );
@@ -785,4 +785,75 @@ test('contextual preparation explains missing approval and returns to research',
       exact: true,
     }),
   ).toBeVisible();
+});
+
+
+test('inferred research angle can be corrected and Track reports one-off collection honestly', async ({ page }) => {
+  await connect(page);
+  const base = new URL(page.url()).pathname.replace(/\/overview$/, '');
+  const projectId = base.split('/').at(-1)!;
+  await page.getByRole('link', { name: 'Research', exact: true }).click();
+  const angle = page.getByLabel('Research angle', { exact: true });
+  await expect(angle).toHaveValue('Improve answer grounding');
+  await expect(page.getByText('Track collects papers once.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Track', exact: true })).toBeDisabled();
+  await angle.fill('Reduce retrieval latency');
+  await page.getByRole('link', { name: '0 research sources', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Research sources', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close Research sources' }).click();
+  await expect(angle).toHaveValue('Reduce retrieval latency');
+  await page.reload();
+  await expect(angle).toHaveValue('Reduce retrieval latency');
+  await page.route(`**/api/v1/projects/${projectId}/sources`, route => route.fulfill({ json: {
+    selection: {},
+    sources: [{ id: 'fixture', name: 'Fixture source', kind: 'arxiv', coverage: 'Synthetic browser fixture' }],
+  } }));
+  let submittedAngle = '';
+  let attempts = 0;
+  await page.route(`**/api/v1/projects/${projectId}/discovery/search`, async route => {
+    submittedAngle = route.request().postDataJSON().query;
+    attempts++;
+    if (attempts === 1) return route.fulfill({ status: 503, json: { message: 'Controlled discovery failure' } });
+    return route.fulfill({ json: {
+      id: '11111111-1111-4111-8111-111111111111', projectId,
+      query: submittedAngle, createdAt: new Date().toISOString(), documentIds: [], outcomes: [], analysisStatus: 'waiting_for_agent',
+    } });
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Track', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Controlled discovery failure');
+  expect(submittedAngle).toBe('Reduce retrieval latency');
+  await expect(angle).toHaveValue('Reduce retrieval latency');
+  await page.getByRole('button', { name: 'Track', exact: true }).click();
+  await expect(page.getByText('No papers to assess', { exact: true })).toBeVisible();
+  await angle.fill('   ');
+  await expect(page.getByRole('button', { name: 'Track', exact: true })).toBeDisabled();
+  await angle.fill('Reduce retrieval latency');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/foundations/track-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: 'test-results/foundations/track-desktop.png', fullPage: true });
+});
+
+test('Research prefers saved onboarding direction and falls back to description without objectives', async ({ page }) => {
+  await connect(page);
+  const base = new URL(page.url()).pathname.replace(/\/overview$/, '');
+  const projectId = base.split('/').at(-1)!;
+  const response = await page.request.get(`/api/v1/projects/${projectId}`);
+  const project = await response.json();
+  await page.route(`**/api/v1/projects/${projectId}`, route => route.fulfill({ json: {
+    ...project,
+    currentContext: { ...project.currentContext, inference: {
+      method: 'repository-metadata-v1', capturedAt: new Date().toISOString(),
+      repositoryRevision: null, files: [], uncertainty: [], researchDirection: 'Reduce irrelevant passages',
+      evaluationCapabilities: [], correctedFields: ['researchDirection'],
+    } },
+  } }));
+  await page.goto(`${base}/research`);
+  await expect(page.getByLabel('Research angle', { exact: true })).toHaveValue('Reduce irrelevant passages');
+  await page.unroute(`**/api/v1/projects/${projectId}`);
+  await page.route(`**/api/v1/projects/${projectId}`, route => route.fulfill({ json: { ...project, objectives: [] } }));
+  await page.reload();
+  await expect(page.getByLabel('Research angle', { exact: true })).toHaveValue(project.description);
 });
