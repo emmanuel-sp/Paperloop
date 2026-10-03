@@ -5,8 +5,11 @@ import { ScheduleEditor } from './ScheduleEditor';
 import { ApiActivationForm } from './ApiActivationForm';
 import { AutomationRuleForm } from './AutomationRuleForm';
 import { useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
+import { useWorkspacePreferences } from './preferences-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  scheduleConfigSchema,
   scheduleListSchema,
   apiActivationListSchema,
   automationStatusSchema,
@@ -27,6 +30,20 @@ export function ScheduleWorkspace({
   view?: 'schedules' | 'settings';
 }) {
   const client = useQueryClient();
+  const preferences = useWorkspacePreferences();
+  const [params, setParams] = useSearchParams();
+  const contextualCreate =
+    view === 'schedules' && params.get('view') === 'create';
+  function closeEditor() {
+    setFormOpen(false);
+    setEditing(null);
+    if (contextualCreate) {
+      const next = new URLSearchParams(params);
+      next.delete('view');
+      setParams(next, { replace: true });
+    }
+    action.reset();
+  }
   const base = `/api/v1/projects/${projectId}`;
   const [instructions, setInstructions] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -103,7 +120,9 @@ export function ScheduleWorkspace({
             action={
               <button
                 className="button primary"
+                disabled={preferences.isPending}
                 onClick={() => {
+                  action.reset();
                   setEditing(null);
                   setFormOpen(true);
                 }}
@@ -124,44 +143,67 @@ export function ScheduleWorkspace({
             />
           ) : null}
           <Dialog
-            open={formOpen}
+            open={formOpen || contextualCreate}
             title={editing ? 'Edit schedule' : 'New schedule'}
             description="Choose when research runs and who handles the work."
             busy={action.isPending}
-            onClose={() => {
-              setFormOpen(false);
-              setEditing(null);
-            }}
+            onClose={closeEditor}
           >
-            <ScheduleEditor
-              key={editing?.id ?? 'new'}
-              {...(editing ? { initial: editing.config } : {})}
-              editing={!!editing}
-              pending={action.isPending}
-              onCancel={() => {
-                setEditing(null);
-                setFormOpen(false);
-              }}
-              onSave={(config) =>
-                action.mutate(
-                  {
-                    path: editing
-                      ? `/api/v1/schedules/${editing.id}`
-                      : `${base}/schedules`,
-                    method: editing ? 'PUT' : 'POST',
-                    body: config,
-                  },
-                  {
-                    onSuccess: () => {
-                      setEditing(null);
-                      setFormOpen(false);
+            {!editing && preferences.isPending ? (
+              <AsyncState
+                kind="loading"
+                title="Loading schedule defaults"
+                description="Reading saved timezone and execution preferences…"
+              />
+            ) : null}
+            {!editing && preferences.isError ? (
+              <AsyncState
+                kind="error"
+                title="Schedule defaults could not load"
+                description={message(preferences.error)}
+                action={{
+                  label: 'Try again',
+                  onClick: () => void preferences.refetch(),
+                }}
+              />
+            ) : null}
+            {editing || preferences.data ? (
+              <ScheduleEditor
+                projectId={projectId}
+                key={editing?.id ?? 'new'}
+                initial={
+                  editing?.config ??
+                  scheduleConfigSchema.parse({
+                    ...preferences.data,
+                    query: (params.get('angle') ?? '').slice(0, 500),
+                  })
+                }
+                editing={!!editing}
+                pending={action.isPending}
+                onCancel={closeEditor}
+                onSave={(config) =>
+                  action.mutate(
+                    {
+                      path: editing
+                        ? `/api/v1/schedules/${editing.id}`
+                        : `${base}/schedules`,
+                      method: editing ? 'PUT' : 'POST',
+                      body: config,
                     },
-                  },
-                )
-              }
-            />
+                    {
+                      onSuccess: closeEditor,
+                    },
+                  )
+                }
+              />
+            ) : null}
             {action.isError ? (
-              <p role="alert">{message(action.error)}</p>
+              <p role="alert">
+                {message(action.error)}{' '}
+                <Link to={`/projects/${projectId}/settings`}>
+                  Review execution settings
+                </Link>
+              </p>
             ) : null}
           </Dialog>
           {state.data?.schedules.length === 0 ? (
@@ -195,6 +237,17 @@ export function ScheduleWorkspace({
                 {String(schedule.config.minute).padStart(2, '0')}{' '}
                 <small>{schedule.config.timezone}</small>
               </div>
+              <p>
+                Research angle:{' '}
+                {schedule.config.query || 'Current project direction'} ·
+                Revision {schedule.revision}
+              </p>
+              <p>
+                Executor:{' '}
+                {schedule.config.driver === 'native'
+                  ? schedule.config.mechanism
+                  : `${schedule.config.provider} paid API`}
+              </p>
               <p className="schedule-setup">
                 {schedule.state} ·{' '}
                 {schedule.config.driver === 'native'
@@ -239,8 +292,9 @@ export function ScheduleWorkspace({
                 <button
                   className="button"
                   type="button"
-                  disabled={schedule.state === 'removed'}
+                  disabled={action.isPending || schedule.state === 'removed'}
                   onClick={() => {
+                    action.reset();
                     setEditing(schedule);
                     setFormOpen(true);
                   }}
@@ -469,7 +523,11 @@ export function ScheduleWorkspace({
           ))}
         </section>
       ) : null}
-      {action.isError && !formOpen && !apiOpen && !automationOpen ? (
+      {action.isError &&
+      !formOpen &&
+      !contextualCreate &&
+      !apiOpen &&
+      !automationOpen ? (
         <p role="alert">{message(action.error)}</p>
       ) : null}
       <Dialog
