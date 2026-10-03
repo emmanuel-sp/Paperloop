@@ -34,7 +34,7 @@ export function ExperimentWorkspace({
       return updated;
     });
   };
-  const [paperId, setPaperId] = useState(params.get('paper') ?? '');
+  const paperId = params.get('paper') ?? '';
   const [planId, setPlanId] = useState('');
   const [copy, setCopy] = useState('');
   const [checkoutPath, setCheckoutPath] = useState('');
@@ -46,6 +46,7 @@ export function ExperimentWorkspace({
     queryKey: ['research-options', projectId],
     queryFn: () => listResearchDocuments(projectId),
   });
+  const contextualPaper = papers.data?.find(paper => paper.id === paperId);
   const plans = useQuery({
     queryKey: ['plans', projectId],
     queryFn: async () =>
@@ -53,6 +54,7 @@ export function ExperimentWorkspace({
         await request(`/api/v1/projects/${projectId}/evaluations`),
       ).plans,
   });
+  const selectedPlanId = planId || params.get('plan') || plans.data?.find(plan => plan.approvedAt)?.id || '';
   const experiments = useQuery({
     queryKey: ['experiments', projectId],
     queryFn: async () =>
@@ -104,7 +106,9 @@ export function ExperimentWorkspace({
       path: `/api/v1/projects/${projectId}/experiments`,
       body: {
         documentId: paperId,
-        planId,
+        ...(params.get('recommendation') ? { recommendationId: params.get('recommendation') } : {}),
+        ...(params.get('angle') ? { researchAngle: params.get('angle') } : {}),
+        planId: selectedPlanId,
         ...(copy ? { isolatedCopy: copy } : {}),
         ...(repository?.kind === 'github' ? { checkoutPath } : {}),
       },
@@ -157,7 +161,7 @@ export function ExperimentWorkspace({
             <p className="workflow-notice">
               Approve an evaluation before preparing work.{' '}
               <Link
-                to={`/projects/${projectId}/experiments?view=evaluation&paper=${paperId}`}
+                to={`/projects/${projectId}/experiments?${new URLSearchParams({ ...Object.fromEntries(params), view: 'evaluation' }).toString()}`}
               >
                 Review Evaluation
               </Link>
@@ -182,30 +186,14 @@ export function ExperimentWorkspace({
                 </span>
               </label>
             ) : null}
+            {contextualPaper ? <section><p className="eyebrow">Source paper</p><h3>{contextualPaper.title}</h3><p className="muted">{contextualPaper.authors.join(', ') || 'Authors not recorded'}</p></section> : <p role="alert">{papers.isPending ? 'Loading the originating paper…' : 'The originating paper is unavailable in this project.'} <Link to={`/projects/${projectId}/research`}>Choose research to evaluate</Link></p>}
             <label>
-              Paper
-              <select
-                name="paperId"
-                autoComplete="off"
-                required
-                value={paperId}
-                onChange={(e) => setPaperId(e.target.value)}
-              >
-                <option value="">Choose paper</option>
-                {papers.data?.map((paper) => (
-                  <option key={paper.id} value={paper.id}>
-                    {paper.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Approved evaluation plan
+              Approved Evaluation
               <select
                 name="planId"
                 autoComplete="off"
                 required
-                value={planId}
+                value={selectedPlanId}
                 onChange={(e) => setPlanId(e.target.value)}
               >
                 <option value="">Choose plan</option>
@@ -232,7 +220,7 @@ export function ExperimentWorkspace({
             <button
               disabled={
                 mutation.isPending ||
-                !plans.data?.some((plan) => plan.approvedAt)
+                (!contextualPaper || !plans.data?.some((plan) => plan.approvedAt && plan.id === selectedPlanId))
               }
               className="button primary"
             >
@@ -259,7 +247,7 @@ export function ExperimentWorkspace({
           ) : null}
           {experiments.data?.length === 0 ? (
             <p className="muted">
-              Your experiments will appear here. Approve an evaluation plan and
+              Your experiments will appear here. Approve an Evaluation and
               add a paper to begin.
             </p>
           ) : null}
@@ -505,7 +493,7 @@ export function ExperimentWorkspace({
                 >
                   <table>
                     <caption className="muted">
-                      Measured results under this evaluation plan
+                      Measured results under this Evaluation
                     </caption>
                     <thead>
                       <tr>

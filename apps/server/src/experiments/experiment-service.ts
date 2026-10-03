@@ -2,11 +2,12 @@ import {
   automationExperiments,
   automationRules,
   appState,
+  researchRecommendations,
 } from '../storage/schema.js';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   evaluationResultSchema,
   type Experiment,
@@ -177,6 +178,10 @@ export class ExperimentService {
   ): ExperimentDetail {
     const project = this.projects.get(projectId);
     const paper = this.research.get(projectId, input.documentId);
+    if (input.recommendationId) {
+      const recommendation = this.database.db.select().from(researchRecommendations).where(and(eq(researchRecommendations.id, input.recommendationId), eq(researchRecommendations.projectId, projectId))).get()?.payload;
+      if (!recommendation || recommendation.documentId !== paper.id || recommendation.proposal.projectContextVersion !== project.currentContext.version) throw new WorkflowError('RESEARCH_CONTEXT_CHANGED', 'The recommendation is unavailable or stale. Reassess it in Research before implementation.');
+    }
     const plan = this.plans.requireApproved(input.planId);
     if (plan.projectId !== projectId)
       throw new WorkflowError(
@@ -219,6 +224,9 @@ export class ExperimentService {
       planId: input.planId,
       contextId: project.currentContext.id,
       briefId: paper.currentBrief?.id ?? null,
+      recommendationId: input.recommendationId ?? null,
+      researchAngle: input.researchAngle ?? project.currentContext.inference?.researchDirection ?? '',
+      sourceVersion: paper.sourceVersion,
       status: 'pending',
       ...workspace,
       claimToken: null,

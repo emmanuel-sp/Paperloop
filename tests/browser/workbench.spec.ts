@@ -100,11 +100,10 @@ test('browser approval through a complete paid-call-free Python comparison', asy
   await expect(
     page.getByRole('dialog', { name: 'Prepare experiment', exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Prepare experiment', exact: true }).getByRole('heading', { name: 'A focused retrieval technique' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Paper', exact: true })).toHaveCount(0);
   await page
-    .getByRole('combobox', { name: 'Paper', exact: true })
-    .selectOption({ label: 'A focused retrieval technique' });
-  await page
-    .getByRole('combobox', { name: 'Approved evaluation plan', exact: true })
+    .getByRole('combobox', { name: 'Approved Evaluation', exact: true })
     .selectOption({ label: 'Retrieval quality v1' });
   await page
     .getByRole('button', { name: 'Prepare experiment', exact: true })
@@ -497,7 +496,7 @@ test('populated section progress reports service work before agent activity', as
   });
   await page.goto(`${base}/experiments?view=prepare&paper=${fixture.paperId}`);
   const dialog = page.getByRole('dialog', { name: 'Prepare experiment', exact: true });
-  await dialog.getByRole('combobox', { name: 'Approved evaluation plan', exact: true }).selectOption({ label: 'Retrieval quality v1' });
+  await dialog.getByRole('combobox', { name: 'Approved Evaluation', exact: true }).selectOption({ label: 'Retrieval quality v1' });
   await dialog.getByRole('button', { name: 'Prepare experiment', exact: true }).click();
   try {
     await expect(dialog.getByRole('status')).toContainText('Agent work begins only after the task is claimed.');
@@ -507,7 +506,8 @@ test('populated section progress reports service work before agent activity', as
   } finally { release(); }
   await expect(dialog.getByRole('alert')).toContainText('Controlled preparation failure');
   await expect(dialog.getByRole('status')).toHaveCount(0);
-  await expect(dialog.getByRole('combobox', { name: 'Paper', exact: true })).toHaveValue(fixture.paperId);
+  await expect(dialog.getByRole('heading', { name: 'A focused retrieval technique', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`paper=${fixture.paperId}`));
   await expect(dialog.getByRole('button', { name: 'Prepare experiment', exact: true })).toBeEnabled();
 });
 
@@ -663,12 +663,12 @@ test('schedule dialogs and nested evaluation forms contain focus and return to t
     exact: true,
   });
   const createTrigger = evaluation.getByRole('button', {
-    name: 'Create an evaluation plan',
+    name: 'Define custom Evaluation',
     exact: true,
   });
   await createTrigger.click();
   const creating = page.getByRole('dialog', {
-    name: 'Create an evaluation plan',
+    name: 'Define custom Evaluation',
     exact: true,
   });
   await expect(creating).toBeVisible();
@@ -765,8 +765,9 @@ test('contextual preparation explains missing approval and returns to research',
     exact: true,
   });
   await expect(
-    dialog.getByRole('combobox', { name: 'Paper', exact: true }),
-  ).toHaveValue(paper!);
+    dialog.getByRole('heading', { name: 'A focused retrieval technique', exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`paper=${paper!}`));
   await expect(
     dialog.getByRole('button', { name: 'Prepare experiment', exact: true }),
   ).toBeDisabled();
@@ -918,7 +919,8 @@ test('ranked findings retain accept/reject decisions and open contextual prepara
   await highCard.getByRole('button', { name: 'Accept & prepare', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Prepare experiment', exact: true })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`paper=${high.document.id}`));
-  await expect(page.getByRole('combobox', { name: 'Paper', exact: true })).toHaveValue(high.document.id);
+  await expect(page.getByRole('dialog', { name: 'Prepare experiment', exact: true }).getByRole('heading', { name: high.document.title, exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Paper', exact: true })).toHaveCount(0);
   await expect(page.getByText('Approve an evaluation before preparing work.', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Prepare experiment', exact: true })).toBeDisabled();
   await page.goto(`${base}/research`);
@@ -954,4 +956,51 @@ test('ranked findings retain accept/reject decisions and open contextual prepara
   await page.reload();
   await expect(page.getByRole('button', { name: 'Track', exact: true })).toBeDisabled();
   await expect(page.getByRole('link', { name: '0 research sources', exact: true })).toBeVisible();
+});
+
+
+test('contextual preparation retains the originating paper across reload and rejects unavailable context', async ({ page }) => {
+  await connect(page);
+  const projectId = page.url().split('/projects/')[1]!.split('/')[0]!;
+  const papers: string[] = [];
+  for (const title of ['Context paper A', 'Context paper B']) {
+    const response = await page.request.post(`/api/v1/projects/${projectId}/research`, { data: { title, sourceKind: 'reference', sourceReference: title, extractionStatus: 'unavailable' } });
+    papers.push((await response.json()).id);
+  }
+  for (const [index, paperId] of papers.entries()) {
+    await page.goto(`/projects/${projectId}/experiments?view=prepare&paper=${paperId}`);
+    await page.reload();
+    const dialog = page.getByRole('dialog', { name: 'Prepare experiment', exact: true });
+    await expect(dialog.getByRole('heading', { name: index === 0 ? 'Context paper A' : 'Context paper B' })).toBeVisible();
+    await expect(dialog.getByRole('combobox', { name: 'Paper', exact: true })).toHaveCount(0);
+  }
+  await page.goto(`/projects/${projectId}/experiments?view=prepare&paper=00000000-0000-4000-8000-000000000000`);
+  const dialog = page.getByRole('dialog', { name: 'Prepare experiment', exact: true });
+  await expect(dialog.getByRole('alert')).toContainText('originating paper is unavailable');
+  await expect(dialog.getByRole('button', { name: 'Prepare experiment', exact: true })).toBeDisabled();
+});
+
+
+test('repository test suggestion becomes an unapproved contextual Evaluation before implementation', async ({ page }) => {
+  await connect(page);
+  const originalId = page.url().split('/projects/')[1]!.split('/')[0]!;
+  const original = await (await page.request.get(`/api/v1/projects/${originalId}`)).json();
+  const project = await (await page.request.post('/api/v1/projects', { data: { name: 'Suggested Evaluation fixture', description: 'Keep retrieval grounded', objectives: ['Improve grounding'], repository: original.repository } })).json();
+  const paper = await (await page.request.post(`/api/v1/projects/${project.id}/research`, { data: { title: 'Suggestion context paper', sourceKind: 'reference', sourceReference: 'Suggestion fixture', extractionStatus: 'unavailable' } })).json();
+  await page.goto(`/projects/${project.id}/experiments?view=evaluation&paper=${paper.id}&angle=Grounded%20retrieval`);
+  const dialog = page.getByRole('dialog', { name: 'Evaluation', exact: true });
+  await expect(dialog.getByText('For Suggestion context paper', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Repository test guardrail', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Use suggested Evaluation', exact: true }).click();
+  await expect(dialog.getByText('Version 1 · Approval required', { exact: true })).toBeVisible();
+  const plans = await (await page.request.get(`/api/v1/projects/${project.id}/evaluations`)).json();
+  expect(plans.plans).toHaveLength(1);
+  expect(plans.plans[0].approvedAt).toBeNull();
+  await dialog.getByRole('button', { name: 'Approve version 1', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Continue to implementation', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Continue to implementation', exact: true }).click();
+  const preparation = page.getByRole('dialog', { name: 'Prepare experiment', exact: true });
+  await expect(preparation.getByRole('heading', { name: 'Suggestion context paper', exact: true })).toBeVisible();
+  await expect(preparation.getByRole('combobox', { name: 'Paper', exact: true })).toHaveCount(0);
+  await expect(page).toHaveURL(/angle=Grounded/);
 });

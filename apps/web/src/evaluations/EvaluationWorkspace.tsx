@@ -5,11 +5,25 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   evaluationPlanDraftSchema,
   evaluationPlanListSchema,
+  evaluationSuggestionSchema,
 } from '@paperloop/contracts';
+import { Link, useSearchParams } from 'react-router';
 import { request } from '../api/client';
 
 export function EvaluationWorkspace({ projectId }: { projectId: string }) {
   const client = useQueryClient();
+  const [params, setParams] = useSearchParams();
+  const documentId = params.get('paper') ?? undefined;
+  const recommendationId = params.get('recommendation') ?? undefined;
+  const researchAngle = params.get('angle') ?? undefined;
+  const suggestion = useQuery({
+    queryKey: ['evaluation-suggestion', projectId, documentId, recommendationId, researchAngle],
+    queryFn: async () => evaluationSuggestionSchema.parse(await request(`/api/v1/projects/${projectId}/evaluation-suggestion?${new URLSearchParams({ ...(documentId ? { documentId } : {}), ...(recommendationId ? { recommendationId } : {}), ...(researchAngle ? { researchAngle } : {}) })}`)),
+  });
+  const useSuggestion = useMutation({
+    mutationFn: () => request(`/api/v1/projects/${projectId}/evaluation-suggestion`, { method: 'POST', body: JSON.stringify({ documentId, recommendationId, researchAngle, contextVersion: suggestion.data!.contextVersion }) }),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: ['plans', projectId] }); await suggestion.refetch(); },
+  });
   const queryKey = ['plans', projectId];
   const query = useQuery({
     queryKey,
@@ -21,12 +35,12 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
   const [name, setName] = useState('');
   const [dataset, setDataset] = useState('');
   const [cases, setCases] = useState('');
-  const [executable, setExecutable] = useState('python3');
-  const [args, setArgs] = useState('evaluate.py');
+  const [executable, setExecutable] = useState('');
+  const [args, setArgs] = useState('');
   const [resultPath, setResultPath] = useState('result.json');
   const [environment, setEnvironment] = useState('local-default');
-  const [metric, setMetric] = useState('latency');
-  const [unit, setUnit] = useState('ms');
+  const [metric, setMetric] = useState('');
+  const [unit, setUnit] = useState('');
   const [direction, setDirection] = useState<'increase' | 'decrease'>(
     'decrease',
   );
@@ -51,11 +65,12 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
       }),
     onSuccess: async (_result, operation) => {
       await client.invalidateQueries({ queryKey });
+      await client.invalidateQueries({ queryKey: ['evaluation-suggestion', projectId] });
       setError('');
       setFeedback(
         operation.path.endsWith('/approve')
-          ? 'Plan approved. You can use it in an experiment.'
-          : 'Plan saved. Review and approve this version below.',
+          ? 'Evaluation approved. Prepare an implementation attempt with these success criteria.'
+          : 'Evaluation saved. Review and approve this version below.',
       );
       if (!operation.path.endsWith('/approve')) setCreating(false);
     },
@@ -101,24 +116,37 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
       });
     } catch (failure) {
       setError(
-        failure instanceof Error ? failure.message : 'Check the plan fields.',
+        failure instanceof Error ? failure.message : 'Check the Evaluation fields.',
       );
     }
   }
   return (
     <div className="research-stack">
+      {suggestion.isPending ? <p role="status">Preparing an Evaluation suggestion…</p> : null}
+      {suggestion.error ? <p role="alert">{suggestion.error.message} <Link to={`/projects/${projectId}/research`}>Return to research</Link></p> : null}
+      {suggestion.data ? <section className="detail-panel research-stack">
+        <p className="eyebrow">Suggested Evaluation</p>
+        {suggestion.data.documentTitle ? <p>For {suggestion.data.documentTitle}</p> : null}
+        <h2>{suggestion.data.plan ? 'Current project Evaluation' : suggestion.data.draft?.name ?? 'Establish how success will be measured'}</h2>
+        <p>Define the criteria before your coding agent implements; evaluate the candidate after it reports readiness.</p>
+        <details><summary>Why this Evaluation?</summary><ul>{suggestion.data.rationale.map(reason => <li key={reason}>{reason}</li>)}</ul><p>Research angle: {suggestion.data.researchAngle}</p></details>
+        {suggestion.data.limitations.map(item => <p className="muted" key={item}>{item}</p>)}
+        {suggestion.data.draft ? <><p>Metrics: {suggestion.data.draft.metrics.map(metric => `${metric.name} (${metric.unit})`).join(', ')}</p><button className="button" disabled={useSuggestion.isPending} onClick={() => useSuggestion.mutate()}>Use suggested Evaluation</button></> : null}
+        {suggestion.data.plan?.approvedAt && documentId ? <button className="button primary" disabled={useSuggestion.isPending} onClick={() => useSuggestion.mutate(undefined, { onSuccess: () => setParams(previous => { const next = new URLSearchParams(previous); next.set('view', 'prepare'); next.set('plan', suggestion.data!.plan!.id); return next; }) })}>Continue to implementation</button> : null}
+      </section> : null}
+      {useSuggestion.error ? <p role="alert">{useSuggestion.error.message}</p> : null}
       <div className="form-actions">
         <button
-          className="button"
+          className="button tertiary"
           type="button"
           onClick={() => setCreating(true)}
         >
-          Create an evaluation plan
+          Define custom Evaluation
         </button>
       </div>
       <Dialog
         open={creating}
-        title="Create an evaluation plan"
+        title="Define custom Evaluation"
         description="Define how a change will be measured. Review each version before approving execution."
         wide
         busy={mutation.isPending}
@@ -389,7 +417,7 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
             </p>
           ) : null}
           <button className="button primary" disabled={mutation.isPending}>
-            Save new plan version
+            Save new Evaluation version
           </button>
         </form>
       </Dialog>
@@ -400,13 +428,13 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
       ) : null}
       {mutation.error ? <p role="alert">{mutation.error.message}</p> : null}
       <div className="overview-stack">
-        {query.isPending ? <p>Loading plans…</p> : null}
+        {query.isPending ? <p>Loading Evaluation…</p> : null}
         {query.error ? <p role="alert">{query.error.message}</p> : null}
         {query.data?.length === 0 ? (
           <section className="detail-panel empty-inline">
-            <h2>No evaluation plans yet</h2>
+            <h2>No saved Evaluation yet</h2>
             <p>
-              Define a plan above, or ask your coding agent to draft one. You
+              Use a suggestion or ask your coding agent to supply a measurement contract. You
               review the command and approve each version here.
             </p>
           </section>
@@ -418,6 +446,7 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
               {plan.approvedAt ? 'Approved' : 'Approval required'}
             </p>
             <h2>{plan.configuration.name}</h2>
+            <p>Measures {plan.configuration.metrics.map(metric => `${metric.name} in ${metric.unit}${metric.guardrail ? ' (guardrail)' : ''}`).join('; ')}.</p>
             <dl className="provenance-list">
               <div>
                 <dt>Dataset</dt>

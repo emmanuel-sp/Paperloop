@@ -89,6 +89,8 @@ export const experimentRequestSchema = z
     baselineRevision: text.optional(),
     isolatedCopy: text.optional(),
     checkoutPath: text.optional(),
+    recommendationId: z.uuid().optional(),
+    researchAngle: z.string().trim().max(500).optional(),
   })
   .strict();
 export type ExperimentRequest = z.infer<typeof experimentRequestSchema>;
@@ -99,6 +101,9 @@ export const experimentSchema = z.object({
   planId: z.uuid(),
   contextId: z.uuid(),
   briefId: z.uuid().nullable(),
+  recommendationId: z.uuid().nullable().optional(),
+  researchAngle: z.string().max(500).optional(),
+  sourceVersion: z.string().nullable().optional(),
   status: z.enum(['pending', 'claimed', 'ready', 'interrupted', 'completed']),
   baselinePath: z.string(),
   candidatePath: z.string(),
@@ -180,3 +185,17 @@ export const experimentListSchema = z.object({
   experiments: z.array(experimentSchema),
 });
 export const artifactContentSchema = z.object({ content: z.string() });
+
+export const evaluationSuggestionSchema = z.object({
+  plan: evaluationPlanSchema.nullable(),
+  draft: evaluationPlanDraftSchema.nullable(),
+  rationale: z.array(z.string()),
+  limitations: z.array(z.string()),
+  documentId: z.uuid().nullable(),
+  documentTitle: z.string().nullable(),
+  sourceVersion: z.string().nullable(),
+  contextVersion: z.number().int().positive(),
+  researchAngle: z.string(),
+  recommendationId: z.uuid().nullable(),
+});
+export type EvaluationSuggestion = z.infer<typeof evaluationSuggestionSchema>;

@@ -88,7 +88,7 @@ export function AutomationRuleForm({
         />
       </label>
       <label>
-        Approved evaluation plan
+        Approved Evaluation
         <select
           name="planId"
           autoComplete="off"
