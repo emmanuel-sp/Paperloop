@@ -31,6 +31,9 @@ import {
   SourceFetchError,
   type PublicFetcher,
 } from './research/public-fetch.js';
+import { SettingsService } from './runtime/settings-service.js';
+import { registerSettingsRoutes } from './runtime/settings-routes.js';
+import type { ProbeExecutor } from './analysis/provider-probe.js';
 import { EvaluationSuggestionService } from './evaluations/suggestion-service.js';
 import { ResearchImportService } from './research/import-service.js';
 import { registerResearchRoutes } from './research/research-routes.js';
@@ -64,6 +67,8 @@ export interface CreateAppOptions {
   researchFetcher?: PublicFetcher;
   logger?: boolean;
   modelExecutor?: ModelExecutor;
+  settingsEnvironment?: NodeJS.ProcessEnv;
+  probeExecutor?: ProbeExecutor;
   scheduleNow?: () => Date;
   dispatcher?: boolean;
   storage?: OpenDatabaseOptions;
@@ -92,6 +97,7 @@ export function createApp(options: CreateAppOptions = {}) {
     options.researchFetcher,
   );
   app.decorate('discovery', discovery);
+  const settings = new SettingsService(database, projectService, options.settingsEnvironment, options.probeExecutor);
   const plans = new PlanService(database, projectService);
   const experiments = new ExperimentService(
     database,
@@ -232,7 +238,8 @@ export function createApp(options: CreateAppOptions = {}) {
   registerResearchRoutes(app, researchService, new ResearchImportService(projectService, researchService, options.researchFetcher));
   registerDiscoveryRoutes(app, discovery, researchService);
   registerWorkflowRoutes(app, plans, experiments, new EvaluationSuggestionService(database, projectService, researchService, plans));
-  registerScheduleRoutes(app, schedules, analysis);
+  registerSettingsRoutes(app, settings);
+  registerScheduleRoutes(app, schedules, analysis, settings);
   registerProjectMcp(
     app,
     projectService,
@@ -241,6 +248,9 @@ export function createApp(options: CreateAppOptions = {}) {
     experiments,
     discovery,
     schedules,
+    request => {
+      if (credentialsMatch(request.headers.authorization?.match(/^Bearer (.+)$/)?.[1], connectionSecret)) settings.observeMcp(request.body);
+    },
   );
 
   app.setErrorHandler(async (error, request, reply) => {

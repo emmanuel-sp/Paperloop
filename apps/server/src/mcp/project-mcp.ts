@@ -68,8 +68,10 @@ export function registerProjectMcp(
   experiments: ExperimentService,
   discovery: DiscoveryService,
   schedules?: ScheduleService,
+  observe?: (request: FastifyRequest) => void,
 ): void {
   app.post('/mcp', async (request, reply) => {
+    reply.raw.once('finish', () => { if (reply.raw.statusCode === 200) observe?.(request); });
     await handleMcpPost(
       request,
       reply,

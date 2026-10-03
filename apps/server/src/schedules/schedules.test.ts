@@ -306,7 +306,7 @@ describe('durable scheduling and native claims', () => {
     ).toBe('cancelled');
   });
   it('enforces browser-only API and rule approvals through HTTP', async () => {
-    const { app, project } = fixture();
+    const { app, project } = fixture({ settingsEnvironment: { OPENAI_API_KEY: 'fixture-key' }, probeExecutor: async () => ({ inputTokens: 4, outputTokens: 1 }) });
     expect(
       (
         await app.inject({
@@ -337,6 +337,7 @@ describe('durable scheduling and native claims', () => {
       headers,
     });
     const cookie = String(session.headers['set-cookie']).split(';')[0]!;
+    await app.inject({ method: 'POST', url: `/api/v1/projects/${project.id}/analysis/test/approve`, headers: { cookie }, payload: { requestId: crypto.randomUUID(), provider: 'openai', model: 'fixture-model', consent: true } });
     expect(
       (
         await app.inject({

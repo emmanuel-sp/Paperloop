@@ -32,6 +32,7 @@ export function ScheduleWorkspace({
   const [formOpen, setFormOpen] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
   const [apiOpen, setApiOpen] = useState(false);
+  const [probePending, setProbePending] = useState(false);
   const [automationOpen, setAutomationOpen] = useState(false);
   const [removing, setRemoving] = useState<Schedule | null>(null);
   const [editing, setEditing] = useState<Schedule | null>(null);
@@ -93,32 +94,6 @@ export function ScheduleWorkspace({
           title="Agent & API"
           description="Choose how analysis happens. Connections and spending stay under your control."
         />
-      ) : null}
-      {view === 'settings' ? (
-        <section className="detail-panel">
-          <SectionHeading
-            eyebrow="Local connection"
-            title="Connect a coding agent"
-          />
-          <p className="muted">
-            Use your local connection secret to connect Codex or Claude Code.
-            Ask the agent to analyze papers or claim an experiment; its progress
-            appears in the workbench.
-          </p>
-          <div className="agent-guide">
-            <p>Streamable HTTP endpoint</p>
-            <code>
-              {import.meta.env.DEV
-                ? 'http://127.0.0.1:3000'
-                : window.location.origin}
-              /mcp
-            </code>
-            <p className="muted">
-              Set the Authorization header to Bearer followed by the connection
-              secret from the startup file. Never paste it into your repository.
-            </p>
-          </div>
-        </section>
       ) : null}
       {view === 'schedules' ? (
         <section className="detail-panel research-stack">
@@ -371,11 +346,13 @@ export function ScheduleWorkspace({
             open={apiOpen}
             title="API analysis"
             description="Enable provider access deliberately. Credentials stay in the server environment."
-            busy={action.isPending}
+            busy={action.isPending || probePending}
             onClose={() => setApiOpen(false)}
           >
             <ApiActivationForm
               key={JSON.stringify(providers.data)}
+              projectId={projectId}
+              onBusyChange={setProbePending}
               activations={providers.data.activations}
               pending={action.isPending}
               onSave={(input) =>

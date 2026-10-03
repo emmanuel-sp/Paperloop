@@ -64,3 +64,11 @@ This mode performs research analysis and evaluation drafting. Implementation wai
 | API settings / activation | `GET /api/v1/projects/:id/analysis`, `POST .../analysis/approve` | Activation is workbench-only |
 
 Schedule configs and request bodies are defined in `packages/contracts/src/schedules.ts`. Lists return the latest 100 project jobs; source scans and extracted document content remain available through discovery/research operations. SQLite schema v6 migrates existing v5 data with a consistent backup. Tests use temporary databases, actual MCP/HTTP clients, Git workspaces, real evaluation subprocesses, and provider fixtures; no paid API calls are required.
+
+## Explicit provider activation and spending limits
+
+Agent & API shows provider-key availability without returning key values. Configure keys in the local service launch environment or through an OS credential manager, then restart; never paste a key into chat or repository configuration.
+
+Before enabling a provider/model, explicitly approve one bounded connection test in the workbench. The test sends a fixed small prompt, requests at most 32 output tokens, times out after 15 seconds, bounds the response, and never retries automatically. Its request ID prevents duplicate execution. A failed or interrupted test may still be billed; startup marks unknown in-flight outcomes failed without retrying. Successful tests show provider-reported input/output tokens. Cost is unavailable without provider billing information and is not invented. Successful testing does not activate analysis.
+
+Enabling analysis is a separate browser approval tied to the tested model. Defaults cap analysis at 1024 output tokens per call and five calls per project/provider per UTC day; failed calls count. Optional limits remain bounded. These are call/token limits, not a guaranteed dollar cap. Disabling prevents future paid starts; already-running requests may finish. Five connection tests per project per UTC day is a separate ceiling.

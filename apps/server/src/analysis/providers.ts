@@ -10,6 +10,7 @@ export interface ModelRequest {
   model: string;
   context: unknown;
   signal: AbortSignal;
+  maxOutputTokens?: number;
 }
 export type ModelExecutor = (request: ModelRequest) => Promise<AnalysisOutput>;
 const instructions =
@@ -18,7 +19,7 @@ export function createModelExecutor(
   environment: NodeJS.ProcessEnv = process.env,
   fetcher: typeof fetch = fetch,
 ): ModelExecutor {
-  return async ({ provider, model, context, signal }) => {
+  return async ({ provider, model, context, signal, maxOutputTokens = 1024 }) => {
     const key =
       environment[
         provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'
@@ -45,12 +46,12 @@ export function createModelExecutor(
             store: false,
             instructions,
             input: prompt,
-            max_output_tokens: 8000,
+            max_output_tokens: maxOutputTokens,
             text: { format: { type: 'json_object' } },
           }
         : {
             model,
-            max_tokens: 8000,
+            max_tokens: maxOutputTokens,
             system: instructions,
             messages: [{ role: 'user', content: prompt }],
             tools: [
