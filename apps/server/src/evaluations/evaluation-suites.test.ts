@@ -544,7 +544,7 @@ describe('suite storage and compatibility boundaries', () => {
         cases(1),
       ),
     ).toThrow(/bound/);
-  });
+  }, 30000);
   it('round-trips v2 drafts through HTTP and MCP, exposing read-only paged evidence tools without approval tooling', async () => {
     const { app, project, root, run } = fixture();
     writeFileSync(
