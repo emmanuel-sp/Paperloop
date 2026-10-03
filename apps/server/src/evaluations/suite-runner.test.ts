@@ -666,6 +666,12 @@ describe('serial suite execution', () => {
 describe('bounded evidence files', () => {
   it('rejects symlinked parent directories and prevents stale file reads', () => {
     const f = fixture([{ id: 'unit' }]);
+    const alias = join(f.root, 'workspace-alias');
+    symlinkSync(f.workspace, alias);
+    writeFileSync(join(f.workspace, 'fresh.xml'), xml());
+    expect(
+      readEvidence(f.workspace, alias, 'fresh.xml', REPORT_BYTES).toString(),
+    ).toBe(xml());
     symlinkSync(f.root, join(f.workspace, 'linked'));
     expect(() =>
       clearReport(f.workspace, f.workspace, 'linked/out.xml'),

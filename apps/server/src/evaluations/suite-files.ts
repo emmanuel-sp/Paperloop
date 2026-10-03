@@ -45,7 +45,9 @@ export function outputPath(
       'Report or artifact path must remain within the isolated workspace.',
     );
   const root = realpathSync(workspace);
-  const target = resolve(cwd, path);
+  // macOS exposes /var through /private/var; compare canonical directory
+  // names while still inspecting every report-relative component for symlinks.
+  const target = resolve(realpathSync(cwd), path);
   const rel = relative(root, target);
   if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel))
     throw new EvidenceError(
