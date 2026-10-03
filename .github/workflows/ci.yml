@@ -28,6 +28,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm test:scenarios
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:browser
       - uses: actions/upload-artifact@v4
@@ -48,6 +49,12 @@ jobs:
         with:
           name: browser-launch-${{ matrix.os }}
           path: test-results/browser-launch/
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scenarios-${{ matrix.os }}
+          path: test-results/scenarios/
           if-no-files-found: ignore
       - run: pnpm release
       - uses: actions/upload-artifact@v4
