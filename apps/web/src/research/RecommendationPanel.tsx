@@ -107,8 +107,9 @@ function RecommendationCard({
 }) {
   const [reason, setReason] = useState(item.reason);
   const navigate = useNavigate();
+  const [contextParams] = useSearchParams();
   const current = item.relevance?.contextCurrent ?? true;
-  const preparation = `/projects/${item.projectId}/experiments?view=prepare&paper=${item.documentId}&recommendation=${item.id}`;
+  const preparation = `/projects/${item.projectId}/experiments?view=prepare&paper=${item.documentId}&recommendation=${item.id}&angle=${encodeURIComponent(contextParams.get('angle') ?? '')}`;
   const client = useQueryClient();
   const triage = useMutation({
     mutationFn: (state: TriageRecommendationRequest['state']) =>

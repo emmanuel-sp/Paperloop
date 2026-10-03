@@ -36,3 +36,11 @@ Nonzero exits, malformed/missing/stale output, timeouts, and cancellation are pe
 ## Verification
 
 `pnpm test` includes an actual MCP client and Python subprocess fixture covering browser-session-only approval, plan version changes, dirty-original preservation, isolated candidate changes, durable comparison/restart state, ownership conflicts and reconciliation, non-Git copies, guardrails, samples, provenance, malformed output, timeout, and process-group cancellation. Python 3 and Git are required for these tests.
+
+## Contextual Evaluation suggestions
+
+Research actions carry the originating paper, recommendation, and angle into preparation and Evaluation. Preparation shows that paper directly; it does not ask the user to pick again. Missing or stale recommendation context requires recovery in Research.
+
+Evaluation offers the current project configuration for explicit relevance review, a validated local `paperloop.evaluation.json` contract, or a bounded `package.json` test-suite guardrail. Repository metadata is read without executing it or following document symlinks. A test-suite suggestion measures the real command exit outcome only; it does not claim research quality or improvement. Unsupported capabilities and missing metrics/results contracts prompt agent-assisted or deliberate custom setup.
+
+Using a suggestion persists an unapproved draft or reuses an identical version, with paper/angle/project provenance. Changed measurement contracts produce new fingerprints and require fresh approval. Suggestions, acceptance, and contextual preparation never grant command approval or paid activation. The approved test adapter is shipped with the local service and writes the normal result protocol from observed outcomes.

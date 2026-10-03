@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import {
   evaluationPlanDraftSchema,
+  evaluationSuggestionSchema,
   evaluationResultSchema,
   experimentRequestSchema,
 } from '@paperloop/contracts';
 import type { FastifyInstance } from 'fastify';
+import type { EvaluationSuggestionService } from '../evaluations/suggestion-service.js';
 import type { PlanService } from '../evaluations/plan-service.js';
 import type { ExperimentService } from './experiment-service.js';
 
@@ -12,7 +14,17 @@ export function registerWorkflowRoutes(
   app: FastifyInstance,
   plans: PlanService,
   experiments: ExperimentService,
+  suggestions: EvaluationSuggestionService,
 ): void {
+  app.get<{ Params: { id: string } }>('/api/v1/projects/:id/evaluation-suggestion', async request => {
+    const query = z.object({ documentId: z.uuid().optional(), recommendationId: z.uuid().optional(), researchAngle: z.string().trim().max(500).optional() }).parse(request.query);
+    return evaluationSuggestionSchema.parse(suggestions.suggest(request.params.id, query.documentId, query.recommendationId, query.researchAngle));
+  });
+  app.post<{ Params: { id: string } }>('/api/v1/projects/:id/evaluation-suggestion', async request => {
+    const input = z.object({ documentId: z.uuid().optional(), recommendationId: z.uuid().optional(), researchAngle: z.string().trim().max(500).optional(), contextVersion: z.number().int().positive() }).parse(request.body);
+    return suggestions.use(request.params.id, input.documentId, input.contextVersion, input.recommendationId, input.researchAngle);
+  });
+
   app.get<{ Params: { id: string } }>(
     '/api/v1/projects/:id/evaluations',
     async (request) => ({ plans: plans.list(request.params.id) }),

@@ -31,6 +31,7 @@ import {
   SourceFetchError,
   type PublicFetcher,
 } from './research/public-fetch.js';
+import { EvaluationSuggestionService } from './evaluations/suggestion-service.js';
 import { ResearchImportService } from './research/import-service.js';
 import { registerResearchRoutes } from './research/research-routes.js';
 import {
@@ -230,7 +231,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerProjectRoutes(app, projectService, github);
   registerResearchRoutes(app, researchService, new ResearchImportService(projectService, researchService, options.researchFetcher));
   registerDiscoveryRoutes(app, discovery, researchService);
-  registerWorkflowRoutes(app, plans, experiments);
+  registerWorkflowRoutes(app, plans, experiments, new EvaluationSuggestionService(database, projectService, researchService, plans));
   registerScheduleRoutes(app, schedules, analysis);
   registerProjectMcp(
     app,

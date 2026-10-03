@@ -169,7 +169,7 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
             </h3>
             <p>
               {papers.length
-                ? 'Review research, approve an evaluation plan, and test a focused change.'
+                ? 'Review research, approve an Evaluation, and test a focused change.'
                 : 'Discover research relevant to your project, then choose a focused change to test.'}
             </p>
             <Link
