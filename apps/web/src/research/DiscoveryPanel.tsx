@@ -5,7 +5,8 @@ import { Icon } from '../components/Icon';
 import { WorkflowStatus } from '../components/WorkflowStatus';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
+import { getProject } from '../api/client';
 import {
   projectSources,
   listScans,
@@ -15,7 +16,30 @@ import {
 } from './discovery-client';
 
 export function DiscoveryPanel({ projectId }: { projectId: string }) {
-  const [query, setQuery] = useState('');
+  const [params, setParams] = useSearchParams();
+  const project = useQuery({
+    queryKey: ['projects', projectId],
+    queryFn: () => getProject(projectId),
+  });
+  const inferredAngle = (
+    project.data?.currentContext.inference?.researchDirection.trim() ||
+    project.data?.objectives.find((objective) => objective.trim()) ||
+    project.data?.description ||
+    ''
+  ).slice(0, 500);
+  const query = (params.get('angle') ?? inferredAngle).slice(0, 500);
+  const sourceParams = new URLSearchParams(params);
+  sourceParams.set('view', 'sources');
+  const sourcesHref = `/projects/${projectId}/research?${sourceParams}`;
+  const setQuery = (angle: string) =>
+    setParams(
+      (previous) => {
+        const updated = new URLSearchParams(previous);
+        updated.set('angle', angle);
+        return updated;
+      },
+      { replace: true },
+    );
   const [url, setUrl] = useState('');
   const [fetchOpen, setFetchOpen] = useState(false);
   const client = useQueryClient();
@@ -43,6 +67,7 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
   const latest = search.data ?? scans.data?.[0];
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!query.trim() || !sources.data?.sources.length || project.isPending || search.isPending) return;
     search.mutate({});
   }
   return (
@@ -50,18 +75,21 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
       <div className="discovery-intro">
         <h2>Discover research</h2>
         <p>
-          Search public sources for relevant papers, then ask your coding agent
-          to assess the evidence.
+          Follow a research angle for this project. Your coding agent assesses
+          the collected evidence.
         </p>
       </div>
       <div>
         <form className="mission-composer" onSubmit={submit}>
-          <Field label="Research question">
+          <Field
+            label="Research angle"
+            hint="Suggested from project context. Edit to focus this collection."
+          >
             {(attributes) => (
               <AutoTextarea
                 autoComplete="off"
                 {...attributes}
-                name="researchQuestion"
+                name="researchAngle"
                 value={query}
                 maxLength={500}
                 rows={2}
@@ -73,7 +101,7 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
           <div className="composer-footer">
             <div className="composer-context">
               <Icon name="sources" />
-              <Link to={`/projects/${projectId}/research?view=sources`}>
+              <Link to={sourcesHref}>
                 {sources.isPending
                   ? 'Loading sources…'
                   : `${sources.data?.sources.length ?? 0} research sources`}
@@ -81,10 +109,13 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
             </div>
             <button
               className="button primary"
-              disabled={search.isPending || !sources.data?.sources.length}
+              disabled={
+                search.isPending || project.isPending || !query.trim() ||
+                !sources.data?.sources.length
+              }
               type="submit"
             >
-              {search.isPending ? 'Searching…' : 'Search sources'}
+              {search.isPending ? 'Collecting…' : 'Track'}
               <Icon name="arrow" />
             </button>
           </div>
@@ -100,10 +131,22 @@ export function DiscoveryPanel({ projectId }: { projectId: string }) {
         !sources.data?.sources.length ? (
           <p className="composer-help">
             Choose{' '}
-            <Link to={`/projects/${projectId}/research?view=sources`}>
+            <Link to={sourcesHref}>
               research sources
             </Link>{' '}
             to start a search.
+          </p>
+        ) : null}
+        <p className="composer-help">
+          Track collects papers once. Ongoing monitoring is not configured by this action.
+        </p>
+        {project.isPending ? <p role="status">Loading the project’s research angle…</p> : null}
+        {project.isError ? (
+          <p role="alert">
+            {errorMessage(project.error)} Enter an angle to continue, or{' '}
+            <button className="button tertiary" type="button" onClick={() => void project.refetch()}>
+              Retry project context
+            </button>.
           </p>
         ) : null}
         <p className="composer-help">
