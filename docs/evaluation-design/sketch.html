@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Layered Evaluation design study</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, sans-serif;
+        color: #eee;
+        background: #101010;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      select,
+      textarea {
+        font: inherit;
+      }
+      button,
+      summary,
+      select {
+        cursor: pointer;
+      }
+      button {
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 10px 15px;
+        background: #202020;
+        color: #eee;
+        width: auto;
+      }
+      button.primary {
+        background: #eee;
+        color: #111;
+        font-weight: 600;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      button:focus-visible,
+      summary:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible {
+        outline: 3px solid #98c6fd;
+        outline-offset: 3px;
+      }
+      .study {
+        background: #232329;
+        padding: 12px 24px;
+        color: #d2d2e4;
+        font-size: 13px;
+      }
+      .study label {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      select {
+        padding: 8px;
+        max-width: 100%;
+        background: #111;
+        color: #eee;
+        border: 1px solid #777;
+        border-radius: 6px;
+      }
+      header,
+      main {
+        max-width: 1040px;
+        margin: auto;
+        padding: 24px;
+      }
+      header {
+        border-bottom: 1px solid #333;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .muted {
+        color: #b0b0b0;
+      }
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #b0b0b0;
+      }
+      h1 {
+        font-size: 29px;
+        line-height: 1.2;
+        margin: 8px 0;
+      }
+      h2 {
+        font-size: 21px;
+        margin: 8px 0 14px;
+      }
+      h3 {
+        font-size: 16px;
+        margin: 0;
+      }
+      p {
+        line-height: 1.6;
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+        gap: 24px;
+      }
+      .panel {
+        border: 1px solid #343434;
+        border-radius: 12px;
+        padding: 24px;
+        min-width: 0;
+        background: #171717;
+      }
+      .stack {
+        display: grid;
+        gap: 20px;
+        min-width: 0;
+      }
+      .row {
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        align-items: start;
+        padding: 15px 0;
+        border-top: 1px solid #333;
+      }
+      .row p {
+        margin: 6px 0;
+        font-size: 13px;
+      }
+      .tag {
+        font-size: 12px;
+        border: 1px solid #555;
+        border-radius: 20px;
+        padding: 4px 9px;
+        flex-shrink: 0;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+      }
+      .notice {
+        border-left: 3px solid #cab38c;
+        padding: 10px 14px;
+        background: #272219;
+        line-height: 1.5;
+      }
+      details {
+        border-top: 1px solid #333;
+        padding: 16px 0;
+      }
+      summary {
+        font-size: 14px;
+      }
+      textarea {
+        width: 100%;
+        min-height: 100px;
+        resize: vertical;
+        border: 1px solid #777;
+        border-radius: 8px;
+        background: #111;
+        color: #eee;
+        padding: 12px;
+        margin-top: 10px;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        max-height: 330px;
+        overflow: auto;
+        background: #101010;
+        padding: 14px;
+        font-size: 12px;
+      }
+      dl {
+        margin: 0;
+      }
+      dt {
+        color: #aaa;
+        font-size: 12px;
+        margin-top: 16px;
+      }
+      dd {
+        margin: 5px 0;
+        overflow-wrap: anywhere;
+        font-size: 14px;
+      }
+      .status {
+        padding: 10px 0;
+        color: #e9d3ae;
+      }
+      dialog {
+        width: min(820px, calc(100% - 24px));
+        max-height: 90dvh;
+        padding: 0;
+        border: 1px solid #777;
+        border-radius: 12px;
+        background: #171717;
+        color: #eee;
+      }
+      dialog::backdrop {
+        background: #000b;
+      }
+      .dialog-heading {
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        align-items: start;
+        padding: 20px;
+        border-bottom: 1px solid #333;
+      }
+      .dialog-body {
+        padding: 20px;
+        overflow: auto;
+        max-height: calc(90dvh - 100px);
+      }
+      .step {
+        border-bottom: 1px solid #444;
+        padding: 16px 0;
+        overflow-wrap: anywhere;
+      }
+      .step code {
+        display: block;
+        margin: 8px 0;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+      footer {
+        padding: 20px;
+        max-width: 1040px;
+        margin: auto;
+        font-size: 12px;
+        color: #aaa;
+      }
+      @media (max-width: 760px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+        header,
+        main {
+          padding: 20px 16px;
+        }
+        .panel {
+          padding: 20px;
+        }
+        h1 {
+          font-size: 25px;
+        }
+        .row {
+          gap: 10px;
+        }
+        .study {
+          padding: 12px 16px;
+        }
+        .tag {
+          white-space: normal;
+          max-width: 90px;
+          text-align: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="study">
+      Design study · Synthetic scenarios · No commands, service requests or real
+      approvals
+      <label
+        >Preview scenario
+        <select id="scenario">
+          <option value="application">Application · suggested suite</option>
+          <option value="ml">ML · suggested suite</option>
+          <option value="missing">Missing contract · no-key fallback</option>
+          <option value="failure">ML · prerequisite failure</option>
+        </select></label
+      >
+    </div>
+    <header>
+      <span>Paperloop / Experiments / Evaluation</span
+      ><span class="muted">Local workspace</span>
+    </header>
+    <main id="content"></main>
+    <footer>
+      Illustrative design for #66. Counts and outcomes shown here are proposed
+      scenario data, not measurements. Detailed comparison presentation belongs
+      to #47.
+    </footer>
+    <dialog id="review" aria-labelledby="review-title">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">Exact scope</p>
+          <h2 id="review-title" tabindex="-1">Review version 1</h2>
+        </div>
+        <button id="close">Close</button>
+      </div>
+      <div class="dialog-body" id="review-content"></div>
+    </dialog>
+    <script type="application/json" id="examples">
+      {
+        "application": {
+          "formatVersion": 2,
+          "name": "Checkout correctness and response time",
+          "datasetIdentity": "synthetic-checkout-fixtures-v1",
+          "environmentIdentity": "node24-pnpm10-chromium-pinned-local",
+          "overallTimeoutMs": 900000,
+          "checks": [
+            {
+              "id": "build",
+              "name": "Build the application",
+              "group": "Readiness",
+              "required": true,
+              "dependsOn": [],
+              "command": {
+                "executable": "pnpm",
+                "arguments": ["build"],
+                "workingDirectory": ".",
+                "timeoutMs": 60000,
+                "environmentReferences": []
+              },
+              "report": { "adapter": "exit-code", "adapterVersion": 1 },
+              "metrics": []
+            },
+            {
+              "id": "types",
+              "name": "Check types",
+              "group": "Readiness",
+              "required": true,
+              "dependsOn": ["build"],
+              "command": {
+                "executable": "pnpm",
+                "arguments": ["typecheck"],
+                "workingDirectory": ".",
+                "timeoutMs": 60000,
+                "environmentReferences": []
+              },
+              "report": { "adapter": "exit-code", "adapterVersion": 1 },
+              "metrics": []
+            },
+            {
+              "id": "lint",
+              "name": "Check lint rules",
+              "group": "Readiness",
+              "required": true,
+              "dependsOn": [],
+              "command": {
+                "executable": "pnpm",
+                "arguments": ["lint"],
+                "workingDirectory": ".",
+                "timeoutMs": 60000,
+                "environmentReferences": []
+              },
+              "report": { "adapter": "exit-code", "adapterVersion": 1 },
+              "metrics": []
+            },
+            {
+              "id": "unit",
+              "name": "Unit tests",
+              "group": "Correctness",
+              "required": true,
+              "dependsOn": ["build"],
+              "command": {
+                "executable": "pnpm",
+                "arguments": [
+                  "test:unit",
+                  "--",
+                  "--reporter=junit",
+                  "--outputFile=reports/unit.xml"
+                ],
+                "workingDirectory": ".",
+                "timeoutMs": 60000,
+                "environmentReferences": []
+              },
+              "report": {
+                "adapter": "junit",
+                "adapterVersion": 1,
+                "path": "reports/unit.xml"
+              },
+              "metrics": []
+            },
+            {
+              "id": "integration",
+              "name": "Integration tests",
+              "group": "Correctness",
+              "required": true,
+              "dependsOn": ["unit"],
+              "command": {
+                "executable": "pnpm",
+                "arguments": [
+                  "test:integration",
+                  "--",
+                  "--reporter=junit",
+                  "--outputFile=reports/integration.xml"
+                ],
+                "workingDirectory": ".",
+                "timeoutMs": 60000,
+                "environmentReferences": []
+              },
+              "report": {
+                "adapter": "junit",
+                "adapterVersion": 1,
+                "path": "reports/integration.xml"
+              },
+              "metrics": []
+            },
+            {
+              "id": "browser",
+              "name": "Browser journeys",
+              "group": "Correctness",
+              "required": true,
+              "dependsOn": ["integration"],
+              "command": {
+                "executable": "pnpm",
+                "arguments": ["test:e2e", "--", "--reporter=junit"],
+                "workingDirectory": ".",
+                "timeoutMs": 120000,
+                "environmentReferences": []
+              },
+              "report": {
+                "adapter": "junit",
+                "adapterVersion": 1,
+                "path": "reports/browser.xml"
+              },
+              "metrics": []
+            },
+            {
+              "id": "latency",
+              "name": "Checkout response time",
+              "group": "Measurement",
+              "required": true,
+              "dependsOn": ["browser", "types", "lint"],
+              "command": {
+                "executable": "pnpm",
+                "arguments": ["benchmark:checkout"],
+                "workingDirectory": ".",
+                "timeoutMs": 120000,
+                "environmentReferences": []
+              },
+              "report": {
+                "adapter": "metrics-v1",
+                "adapterVersion": 1,
+                "path": "reports/checkout.json"
+              },
+              "metrics": [
+                {
+                  "name": "p95_latency",
+                  "unit": "ms",
+                  "direction": "decrease",
+                  "minimumImprovement": 5,
+                  "maximumRegression": 0,
+                  "minimumSamples": 60,
+                  "guardrail": false
+                }
+              ]
+            }
+          ]
+        },
+        "ml": {
+          "formatVersion": 2,
+          "name": "Linear model error with correctness and operations guardrail",
+          "datasetIdentity": "synthetic-linear-300-v1",
+          "environmentIdentity": "node24-local-no-provider",
+          "overallTimeoutMs": 180000,
+          "checks": [
+            {
+              "id": "syntax",
+              "name": "Check model harness syntax",
+              "group": "Readiness",
+              "required": true,
+              "dependsOn": [],
+              "command": {
+                "executable": "node",
+                "arguments": ["--check", "evaluate.mjs"],
+                "workingDirectory": ".",
+                "timeoutMs": 10000,
+                "environmentReferences": []
+              },
+              "report": { "adapter": "exit-code", "adapterVersion": 1 },
+              "metrics": []
+            },
+            {
+              "id": "correctness",
+              "name": "Model correctness tests",
+              "group": "Correctness",
+              "required": true,
+              "dependsOn": ["syntax"],
+              "command": {
+                "executable": "node",
+                "arguments": [
+                  "--test",
+                  "--test-reporter=junit",
+                  "--test-reporter-destination=reports/model.xml",
+                  "model.test.mjs"
+                ],
+                "workingDirectory": ".",
+                "timeoutMs": 30000,
+                "environmentReferences": []
+              },
+              "report": {
+                "adapter": "junit",
+                "adapterVersion": 1,
+                "path": "reports/model.xml"
+              },
+              "metrics": []
+            },
+            {
+              "id": "prediction",
+              "name": "300-case prediction benchmark",
+              "group": "Measurement",
+              "required": true,
+              "dependsOn": ["correctness"],
+              "command": {
+                "executable": "node",
+                "arguments": ["evaluate.mjs"],
+                "workingDirectory": ".",
+                "timeoutMs": 30000,
+                "environmentReferences": []
+              },
+              "report": {
+                "adapter": "metrics-v1",
+                "adapterVersion": 1,
+                "path": "result.json"
+              },
+              "metrics": [
+                {
+                  "name": "mean_absolute_error",
+                  "unit": "error",
+                  "direction": "decrease",
+                  "minimumImprovement": 0.01,
+                  "maximumRegression": 0,
+                  "minimumSamples": 300,
+                  "guardrail": false
+                },
+                {
+                  "name": "operations",
+                  "unit": "per case",
+                  "direction": "decrease",
+                  "minimumImprovement": 0,
+                  "maximumRegression": 0,
+                  "minimumSamples": 300,
+                  "guardrail": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    </script>
+    <script>
+      /* global document, structuredClone */
+      const examples = JSON.parse(
+        document.querySelector("#examples").textContent,
+      );
+      const preview = document.querySelector("#scenario"),
+        content = document.querySelector("#content"),
+        dialog = document.querySelector("#review");
+      let state = {
+        key: "application",
+        version: 1,
+        pending: false,
+        approved: false,
+      };
+      let trigger;
+      function escape(value) {
+        return String(value).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      }
+      function selected() {
+        const value = structuredClone(
+          examples[state.key === "application" ? "application" : "ml"],
+        );
+        if (state.version === 2) {
+          if (state.key === "application") value.overallTimeoutMs = 600000;
+          else value.checks[2].metrics[0].minimumImprovement = 0.02;
+        }
+        return value;
+      }
+      function render() {
+        const missing = state.key === "missing",
+          failed = state.key === "failure",
+          app = state.key === "application",
+          plan = selected();
+        const title = missing
+          ? "Ask your agent for a measurement contract"
+          : failed
+            ? "Required validation failed; measurement skipped"
+            : app
+              ? "Protect checkout, then measure response time"
+              : "Verify the model, then measure prediction error";
+        const summary = missing
+          ? "The repository has a test command, but no quality benchmark or report configuration. A single-command correctness check is available; it cannot establish a research improvement."
+          : failed
+            ? "The syntax check failed. Model correctness and the 300-case benchmark were skipped. A separate external claim of lower error is not compatible evidence for this run."
+            : app
+              ? "Build, types and lint establish readiness. Existing unit, integration and browser tests protect checkout correctness. Compare the supplied local latency benchmark only after they pass."
+              : "Verify syntax and model correctness before measuring the same 300 synthetic cases. Reduce mean absolute error while keeping operations per case from increasing.";
+        const note = app
+          ? "Keep the whole Evaluation within ten minutes."
+          : "Require at least 0.02 less mean absolute error.";
+        content.innerHTML = `<div class="stack"><section class="panel"><p class="eyebrow">${failed ? "Outcome illustration" : "Suggested Evaluation"} · ${missing ? "Unconfigured project" : app ? "Checkout application" : "Linear model lab"}</p><h1>${title}</h1><p>${summary}</p><p class="muted">${missing ? "Observed repository test script; benchmark and report configuration are unavailable." : app ? "From repository scripts, configured reports and the accepted checkout research proposal." : "From the supplied local model contract and the originating calibration proposal."}</p>${state.version === 2 ? `<p class="notice">Revision 2: ${app ? "Overall bound changed from 15 to 10 minutes." : "Minimum error improvement changed from 0.01 to 0.02."} Commands unchanged. This revision needs its own approval.</p>` : ""}${failed ? '<p class="notice">Required validation: failed. Overall comparison: inconclusive because a comparable passing baseline is unavailable. No improvement claim is supported.</p>' : missing ? '<p class="notice">Quality evidence unavailable. No API key is needed to ask your connected agent for a draft.</p>' : `<div class="row"><div><h3>Required correctness</h3><p>${app ? "Build, types, lint · 480 unit cases · 24 integration cases · 30 browser journeys" : "Harness syntax · model correctness suite"}</p></div><span class="tag">Before measurement</span></div><div class="row"><div><h3>${app ? "Response time" : "Prediction error"}</h3><p>${app ? "60 local samples; aim for at least 5 ms lower p95 latency" : "300 synthetic cases; aim for at least " + (state.version === 2 ? "0.02" : "0.01") + " less error. Operations is a guardrail."}</p></div><span class="tag">Improvement</span></div>`}${!missing && !failed ? `<details><summary>Adjust the goal (optional)</summary><label for="correction">What would you change?</label><textarea id="correction">${escape(state.note ?? note)}</textarea><div class="actions"><button id="request">Request a revision</button></div><p class="muted">This sketch demonstrates one fixed revision per project. Other text remains pending for an agent; it is not silently interpreted.</p></details><p id="status" class="status" role="status">${state.pending ? "Revision requested — awaiting agent draft." : state.approved ? "Simulated approval display. No command has run." : `Version ${state.version} · Draft awaiting approval`}</p><div class="actions"><button class="primary" id="review-button" ${state.pending || state.approved ? "disabled" : ""}>Review exact steps</button>${state.pending ? '<button id="receive">Preview the fixed agent revision</button>' : ""}</div>` : missing ? '<div class="actions"><button id="fallback">Show single-command fallback</button></div><p id="status" class="status" role="status"></p>' : '<div class="row"><span>Syntax</span><strong>Failed</strong></div><div class="row"><span>Correctness</span><strong>Skipped · syntax</strong></div><div class="row"><span>Prediction benchmark</span><strong>Skipped · correctness</strong></div><p class="muted">Inspect the failure log and revise the harness before starting a new run. The existing attempt remains recorded.</p>'}</section></div><aside class="panel"><h2>Context retained</h2><dl><dt>Project</dt><dd>${missing ? "Unconfigured project" : app ? "Checkout application" : "Linear model lab"}</dd><dt>Originating research</dt><dd>${missing ? "Repository test command only; quality contract missing" : app ? "Synthetic checkout response-time proposal" : "Synthetic linear prediction calibration"}</dd><dt>Evaluation scope</dt><dd>${missing ? "Quality contract missing" : plan.checks.length + " named checks; no manual case list"}</dd><dt>Overall bound per run</dt><dd>${missing ? "Not configured" : plan.overallTimeoutMs / 60000 + " minutes"}</dd><dt>Execution</dt><dd>Local commands, with your permissions. Baseline and candidate remain separate.</dd></dl><p class="muted">Approval permits this exact version. Running remains a separate action.</p>${missing ? "" : "<details><summary>Optional expert configuration</summary><pre>" + escape(JSON.stringify(plan, null, 2)) + "</pre></details>"}</aside>`;
+        document
+          .querySelector("#review-button")
+          ?.addEventListener("click", openReview);
+        document.querySelector("#request")?.addEventListener("click", () => {
+          state.note = document.querySelector("#correction").value;
+          state.pending = true;
+          render();
+          document.querySelector("#status").textContent =
+            "Revision requested: " + state.note + " Awaiting agent draft.";
+        });
+        document.querySelector("#receive")?.addEventListener("click", () => {
+          if (state.note !== note) {
+            document.querySelector("#status").textContent =
+              "This correction needs an agent response. The fixed example does not apply.";
+            return;
+          }
+          state.version = 2;
+          state.pending = false;
+          render();
+        });
+        document.querySelector("#fallback")?.addEventListener("click", () => {
+          document.querySelector("#status").textContent =
+            "Draft fallback: run the verified repository test command once in each workspace. Exact command/result review is still required; case coverage and quality improvement remain unknown.";
+        });
+      }
+      function openReview() {
+        trigger = document.activeElement;
+        const plan = selected();
+        document.querySelector("#review-title").textContent =
+          "Review version " + state.version;
+        document.querySelector("#review-content").innerHTML =
+          `<p>All ${plan.checks.length} steps below belong to this version. Overall limit: ${plan.overallTimeoutMs / 60000} minutes per baseline or candidate run.</p>${plan.checks.map((c) => `<section class="step"><h3>${escape(c.name)} · ${escape(c.id)}</h3><code>${escape(JSON.stringify([c.command.executable, ...c.command.arguments]))}</code><p>Directory: ${escape(c.command.workingDirectory)} · ${c.command.timeoutMs / 1000}s · Environment references: ${escape(c.command.environmentReferences.join(", ") || "none")}</p><p>Report: ${escape(c.report.adapter)} v${c.report.adapterVersion} ${escape(c.report.path || "(exit outcome only)")} · Prerequisites: ${escape(c.dependsOn.join(", ") || "none")} · ${c.required ? "Required" : "Optional"}</p></section>`).join("")}<details><summary>Full immutable configuration</summary><pre>${escape(JSON.stringify(plan, null, 2))}</pre></details><p class="notice">Design preview only. The production review will display the actual version fingerprint and bind approval to it. This button cannot authorize execution.</p><button class="primary" id="approve">Simulate approval of version ${state.version}</button>`;
+        document.querySelector("#approve").addEventListener("click", () => {
+          state.approved = true;
+          dialog.close();
+          render();
+        });
+        dialog.showModal();
+        document.querySelector("#review-title").focus();
+      }
+      document
+        .querySelector("#close")
+        .addEventListener("click", () => dialog.close());
+      dialog.addEventListener(
+        "close",
+        () => trigger?.isConnected && trigger.focus(),
+      );
+      preview.addEventListener("change", () => {
+        state = {
+          key: preview.value,
+          version: 1,
+          pending: false,
+          approved: false,
+        };
+        render();
+      });
+      render();
+    </script>
+  </body>
+</html>

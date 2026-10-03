@@ -106,6 +106,7 @@ Save action was found in this matrix. This is the foundation review, not final
 milestone acceptance. The existing build emits font-resolution and bundle-size
 warnings; they are outside this fixture change and remain for cross-section review.
 
-Next bounded unit: #66's design-first inventory, concrete conventional/ML examples,
-and agent-led populated sketches, using this loader before selecting new contracts.
+The next #66 phase is recorded in [the layered Evaluation design](EVALUATION_SUITES.md),
+with conventional/ML examples and agent-led populated sketches. After that design
+record, implement versioned contracts/storage in a dedicated bounded phase.
 Keep #46 open for its remaining scenario and final live/visual/workflow coverage.
