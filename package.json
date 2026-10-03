@@ -14,7 +14,9 @@
     "start": "pnpm --filter @paperloop/server start",
     "doctor": "node apps/server/dist/index.js doctor",
     "release": "pnpm build && node scripts/release/package.mjs",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "demo:seed": "node scripts/scenarios/load.mjs",
+    "test:scenarios": "node --test scripts/scenarios/seed.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -63,3 +63,5 @@ pnpm test
 ```
 
 `pnpm build` compiles contracts first, then the server and web app. CI runs these commands and Chromium workflows on Linux and macOS with a frozen lockfile, verifies the installed release bundle, and uploads the archive. Run `pnpm test:browser` after building for the browser regression suite.
+
+Optional isolated developer scenarios for populated review and real tiny local measurements: [scenario loader](docs/SCENARIOS.md).

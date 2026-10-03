@@ -54,6 +54,8 @@ GitHub issues contain acceptance criteria; GitHub Project #2 contains status. Re
 | 6 | #45 | Overview after onboarding, Research, and Experiments have stable context and next actions. Dedicated populated-state design pass. |
 | 7 | #46, then #34 | Repeatable isolated ML demo, full journey, populated desktop/mobile visual inspection, failure and no-key states. Complete the roadmap only after every included issue is verified. |
 
+Later owner amendments in #34 override the original table where dependencies changed: publish #46’s reusable scenario foundation early, design #66 before changing Evaluation contracts, coordinate its evidence with #47, and implement #63 with the remaining #44/#43 amendments before #50. Final #46 verification remains last. See [isolated scenarios](SCENARIOS.md) for the early fixture loader.
+
 Only one implementation PR should be active under this worker at a time. Existing user work or another worker's PR takes priority over starting a competing change. Fresh threads should read the selected issue, directly required dependencies, the relevant design document, and the previous checkpoint; do not import the whole historical conversation on every run.
 
 ## Owner's design notes

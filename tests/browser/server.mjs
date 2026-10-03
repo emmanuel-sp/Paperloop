@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { scheduleConfigSchema } from '../../packages/contracts/dist/index.js';
+import { seedScenarios } from '../../scripts/scenarios/seed.mjs';
 import { createApp } from '../../apps/server/dist/app.js';
 import { GithubAccessError } from '../../apps/server/dist/projects/github-service.js';
 import { BrowserLaunch } from '../../apps/server/dist/runtime/browser-launch.js';
@@ -212,6 +213,12 @@ app.post('/__test/foundations', async () => {
     experimentId: detail.experiment.id,
     paperId: paper.id,
   };
+});
+// Shared loader is reachable only in this isolated browser-test server.
+let scenarioPromise;
+app.post('/__test/scenarios', async () => {
+  scenarioPromise ??= seedScenarios(app, join(root, 'scenarios'));
+  return scenarioPromise;
 });
 await app.listen({ host: '127.0.0.1', port: 43187 });
 console.log('Browser fixture ready');
