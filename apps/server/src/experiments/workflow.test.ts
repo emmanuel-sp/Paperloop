@@ -868,3 +868,29 @@ time.sleep(20)
     },
   );
 });
+
+
+describe('visible implementation lifecycle', () => {
+  it('retains structured readiness evidence and actual check-in timestamps', async () => {
+    const { app, project, paper, plan } = await fixture();
+    app.plans.approve(plan.id, plan.fingerprint);
+    const detail = app.experiments.create(project.id, { documentId: paper.id, planId: plan.id });
+    const claimed = app.experiments.claim(detail.experiment.id, 'implementation-agent');
+    expect(claimed.experiment.lastAgentCheckIn).toEqual(expect.any(String));
+    const ready = app.experiments.progress(detail.experiment.id, claimed.experiment.claimToken!, 'Candidate prepared', true, { summary: 'Applied the technique', changedFiles: ['score.txt'], checks: ['Inspected the isolated change'], limitations: ['Quality still requires Evaluation'] });
+    expect(ready.experiment.implementationSummary).toMatchObject({ summary: 'Applied the technique', changedFiles: ['score.txt'] });
+    expect(app.experiments.get(detail.experiment.id).implementationSummary).toEqual(ready.experiment.implementationSummary);
+  });
+  it('normalizes an expired claim into interruption before displaying or executing it', async () => {
+    const { app, project, paper, plan } = await fixture();
+    app.plans.approve(plan.id, plan.fingerprint);
+    const detail = app.experiments.create(project.id, { documentId: paper.id, planId: plan.id });
+    const claimed = app.experiments.claim(detail.experiment.id, 'implementation-agent').experiment;
+    app.database.db.update(experiments).set({ payload: { ...claimed, claimExpiresAt: new Date(0).toISOString() } }).where(eq(experiments.id, claimed.id)).run();
+    expect(app.experiments.list(project.id)[0]!.status).toBe('interrupted');
+    expect(() => app.experiments.startRun(claimed.id, 'candidate')).toThrow(/Reconcile/);
+    expect(() => app.experiments.claim(claimed.id, 'another-agent')).toThrow(/reconciliation/);
+    app.experiments.reconcile(claimed.id, 'Inspected processes and candidate workspace.');
+    expect(app.experiments.claim(claimed.id, 'another-agent').experiment.status).toBe('claimed');
+  });
+});

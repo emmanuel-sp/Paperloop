@@ -1168,3 +1168,8 @@ h3 {
 .onboarding-panel details p { overflow-wrap: anywhere; }
 .onboarding-panel details > .project-form { margin-top: 16px; }
 @media (max-width: 600px) { .onboarding-summary { grid-template-columns: minmax(0, 1fr); } }
+
+.experiment-lifecycle { min-width: 0; overflow-wrap: anywhere; }
+.experiment-stages { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 12px; list-style: none; padding: 0; margin: 0; }
+.experiment-stages li { border-top: 1px solid #343430; padding-top: 12px; display: grid; gap: 8px; }
+.experiment-stages span { color: var(--muted); font-size: 12px; }

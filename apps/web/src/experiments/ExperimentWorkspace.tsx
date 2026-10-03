@@ -1,3 +1,4 @@
+import { ExperimentLifecycle } from './ExperimentLifecycle';
 import { Dialog } from '../components/Dialog';
 import { AutoTextarea } from '../components/AutoTextarea';
 import { AsyncState } from '../components/AsyncState';
@@ -251,18 +252,15 @@ export function ExperimentWorkspace({
               add a paper to begin.
             </p>
           ) : null}
-          {experiments.data?.map((item) => (
-            <button
-              key={item.id}
-              className="research-item"
-              aria-pressed={item.id === id}
-              onClick={() => setSelected(item.id)}
-            >
-              <WorkflowStatus value={item.status} />
-              <small>{formatDate(item.createdAt)}</small>
-              <small>{item.progress}</small>
-            </button>
-          ))}
+          {[
+            { title: 'Waiting for an agent', statuses: ['pending'] },
+            { title: 'Active attempts', statuses: ['claimed', 'ready'] },
+            { title: 'Needs recovery', statuses: ['interrupted'] },
+            { title: 'Completed attempts', statuses: ['completed'] },
+          ].map(group => {
+            const items = experiments.data?.filter(item => group.statuses.includes(item.status)) ?? [];
+            return items.length ? <section className="research-stack" key={group.title}><h3>{group.title} · {items.length}</h3>{items.map(item => <button key={item.id} className="research-item" aria-pressed={item.id === id} onClick={() => setSelected(item.id)}><strong>{papers.data?.find(paper => paper.id === item.documentId)?.title ?? 'Research implementation'}</strong><WorkflowStatus value={item.status} /><small>{formatDate(item.createdAt)}</small><small>{item.progress}</small></button>)}</section> : null;
+          })}
         </section>
       </div>
       <div className="overview-stack">
@@ -280,10 +278,11 @@ export function ExperimentWorkspace({
         {id && detail.isPending ? <p>Loading experiment…</p> : null}
         {detail.data ? (
           <>
+            <ExperimentLifecycle detail={detail.data} paper={papers.data?.find(paper => paper.id === detail.data!.experiment.documentId)} />
             <section className="detail-panel">
               <WorkflowStatus value={detail.data.experiment.status} />
               <h2>{detail.data.plan.configuration.name}</h2>
-              <p role="status">{detail.data.experiment.progress}</p>
+
               <Link
                 className="text-link"
                 to={`/projects/${projectId}/research?view=library&paper=${detail.data.experiment.documentId}`}
@@ -302,14 +301,14 @@ export function ExperimentWorkspace({
                   {detail.data.experiment.briefId ?? 'Pending'}
                 </p>
               </details>
-              <div className="workflow-notice">
-                <strong>Next actions</strong>
+              <details className="workflow-notice">
+                <summary>Detailed task instructions</summary>
                 <ol>
                   {detail.data.nextActions.map((action) => (
                     <li key={action}>{action}</li>
                   ))}
                 </ol>
-              </div>
+              </details>
               {detail.data.experiment.status === 'pending' ? (
                 <p className="muted">
                   Ask your connected coding agent to claim this experiment
@@ -397,7 +396,7 @@ export function ExperimentWorkspace({
                     })
                   }
                 >
-                  Run candidate
+                  Evaluate candidate
                 </button>
                 <button
                   className="button primary"
@@ -452,6 +451,7 @@ export function ExperimentWorkspace({
                 <h2>
                   <WorkflowStatus value={comparison.outcome} />
                 </h2>
+                <p>{comparison.outcome === 'improvement' ? 'Review the implementation and measurement limits before deciding whether to integrate the candidate.' : comparison.outcome === 'regression' ? 'Inspect the regressions and revise or reject this candidate before integrating it.' : comparison.outcome === 'inconclusive' ? 'Gather compatible evidence or additional samples before making an implementation decision.' : 'No meaningful improvement is established. Review the tradeoffs before deciding whether to keep the change.'}</p>
                 {comparison.metrics[0] ? (
                   <div className="comparison-highlight">
                     <div>

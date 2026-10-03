@@ -10,6 +10,8 @@ import { join } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import {
   evaluationResultSchema,
+  implementationEvidenceSchema,
+  type ImplementationEvidence,
   type Experiment,
   type ExperimentRequest,
   type ExperimentDetail,
@@ -114,7 +116,8 @@ export class ExperimentService {
       .from(experiments)
       .where(eq(experiments.projectId, projectId))
       .all()
-      .map((row) => row.payload);
+      .map((row) => this.get(row.id))
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   }
   get(id: string): Experiment {
     const row = this.database.db
@@ -128,7 +131,14 @@ export class ExperimentService {
         'Experiment was not found.',
         404,
       );
-    return row.payload;
+    const experiment = row.payload;
+    if (experiment.status === 'claimed' && Date.parse(experiment.claimExpiresAt ?? '') <= Date.now()) {
+      const interrupted = { ...experiment, status: 'interrupted' as const, reconciliation: null };
+      this.save(interrupted);
+      this.database.db.update(experimentJobs).set({ status: 'interrupted' }).where(eq(experimentJobs.experimentId, id)).run();
+      return interrupted;
+    }
+    return experiment;
   }
   detail(id: string): ExperimentDetail {
     const experiment = this.get(id);
@@ -232,6 +242,8 @@ export class ExperimentService {
       claimToken: null,
       claimOwner: null,
       claimExpiresAt: null,
+      lastAgentCheckIn: null,
+      implementationSummary: null,
       progress: 'Waiting for an agent.',
       reconciliation: null,
       createdAt: new Date().toISOString(),
@@ -285,6 +297,8 @@ export class ExperimentService {
         claimOwner: owner,
         claimToken: token,
         claimExpiresAt: expires,
+        lastAgentCheckIn: new Date().toISOString(),
+        implementationSummary: null,
       });
       this.database.db
         .update(experimentJobs)
@@ -299,9 +313,11 @@ export class ExperimentService {
     token: string,
     message: string,
     ready: boolean,
+    evidence?: ImplementationEvidence,
   ): ExperimentDetail {
     const experiment = this.get(id);
     this.checkAutomationAuthorization(id);
+    if (experiment.status === 'interrupted') throw new WorkflowError('RECONCILIATION_REQUIRED', 'The claim expired or implementation was interrupted. Inspect and reconcile before another attempt.');
     if (experiment.status !== 'claimed' || experiment.claimToken !== token)
       throw new WorkflowError(
         'INVALID_CLAIM',
@@ -321,6 +337,8 @@ export class ExperimentService {
     this.save({
       ...experiment,
       progress: message,
+      lastAgentCheckIn: new Date().toISOString(),
+      ...(ready ? { implementationSummary: implementationEvidenceSchema.parse(evidence ?? { summary: message }) } : {}),
       status: ready ? 'ready' : 'claimed',
       claimExpiresAt: expires,
     });
