@@ -1,0 +1,101 @@
+{
+  "formatVersion": 2,
+  "name": "Linear model error with correctness and operations guardrail",
+  "datasetIdentity": "synthetic-linear-300-v1",
+  "environmentIdentity": "node24-local-no-provider",
+  "overallTimeoutMs": 180000,
+  "checks": [
+    {
+      "id": "syntax",
+      "name": "Check model harness syntax",
+      "group": "Readiness",
+      "required": true,
+      "dependsOn": [],
+      "command": {
+        "executable": "node",
+        "arguments": [
+          "--check",
+          "evaluate.mjs"
+        ],
+        "workingDirectory": ".",
+        "timeoutMs": 10000,
+        "environmentReferences": []
+      },
+      "report": {
+        "adapter": "exit-code",
+        "adapterVersion": 1
+      },
+      "metrics": []
+    },
+    {
+      "id": "correctness",
+      "name": "Model correctness tests",
+      "group": "Correctness",
+      "required": true,
+      "dependsOn": [
+        "syntax"
+      ],
+      "command": {
+        "executable": "node",
+        "arguments": [
+          "--test",
+          "--test-reporter=junit",
+          "--test-reporter-destination=reports/model.xml",
+          "model.test.mjs"
+        ],
+        "workingDirectory": ".",
+        "timeoutMs": 30000,
+        "environmentReferences": []
+      },
+      "report": {
+        "adapter": "junit",
+        "adapterVersion": 1,
+        "path": "reports/model.xml"
+      },
+      "metrics": []
+    },
+    {
+      "id": "prediction",
+      "name": "300-case prediction benchmark",
+      "group": "Measurement",
+      "required": true,
+      "dependsOn": [
+        "correctness"
+      ],
+      "command": {
+        "executable": "node",
+        "arguments": [
+          "evaluate.mjs"
+        ],
+        "workingDirectory": ".",
+        "timeoutMs": 30000,
+        "environmentReferences": []
+      },
+      "report": {
+        "adapter": "metrics-v1",
+        "adapterVersion": 1,
+        "path": "result.json"
+      },
+      "metrics": [
+        {
+          "name": "mean_absolute_error",
+          "unit": "error",
+          "direction": "decrease",
+          "minimumImprovement": 0.01,
+          "maximumRegression": 0,
+          "minimumSamples": 300,
+          "guardrail": false
+        },
+        {
+          "name": "operations",
+          "unit": "per case",
+          "direction": "decrease",
+          "minimumImprovement": 0,
+          "maximumRegression": 0,
+          "minimumSamples": 300,
+          "guardrail": true
+        }
+      ]
+    }
+  ]
+}

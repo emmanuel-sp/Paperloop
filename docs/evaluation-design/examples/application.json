@@ -1,0 +1,190 @@
+{
+  "formatVersion": 2,
+  "name": "Checkout correctness and response time",
+  "datasetIdentity": "synthetic-checkout-fixtures-v1",
+  "environmentIdentity": "node24-pnpm10-chromium-pinned-local",
+  "overallTimeoutMs": 900000,
+  "checks": [
+    {
+      "id": "build",
+      "name": "Build the application",
+      "group": "Readiness",
+      "required": true,
+      "dependsOn": [],
+      "command": {
+        "executable": "pnpm",
+        "arguments": [
+          "build"
+        ],
+        "workingDirectory": ".",
+        "timeoutMs": 60000,
+        "environmentReferences": []
+      },
+      "report": {
+        "adapter": "exit-code",
+        "adapterVersion": 1
+      },
+      "metrics": []
+    },
+    {
+      "id": "types",
+      "name": "Check types",
+      "group": "Readiness",
+      "required": true,
+      "dependsOn": [
+        "build"
+      ],
+      "command": {
+        "executable": "pnpm",
+        "arguments": [
+          "typecheck"
+        ],
+        "workingDirectory": ".",
+        "timeoutMs": 60000,
+        "environmentReferences": []
+      },
+      "report": {
+        "adapter": "exit-code",
+        "adapterVersion": 1
+      },
+      "metrics": []
+    },
+    {
+      "id": "lint",
+      "name": "Check lint rules",
+      "group": "Readiness",
+      "required": true,
+      "dependsOn": [],
+      "command": {
+        "executable": "pnpm",
+        "arguments": [
+          "lint"
+        ],
+        "workingDirectory": ".",
+        "timeoutMs": 60000,
+        "environmentReferences": []
+      },
+      "report": {
+        "adapter": "exit-code",
+        "adapterVersion": 1
+      },
+      "metrics": []
+    },
+    {
+      "id": "unit",
+      "name": "Unit tests",
+      "group": "Correctness",
+      "required": true,
+      "dependsOn": [
+        "build"
+      ],
+      "command": {
+        "executable": "pnpm",
+        "arguments": [
+          "test:unit",
+          "--",
+          "--reporter=junit",
+          "--outputFile=reports/unit.xml"
+        ],
+        "workingDirectory": ".",
+        "timeoutMs": 60000,
+        "environmentReferences": []
+      },
+      "report": {
+        "adapter": "junit",
+        "adapterVersion": 1,
+        "path": "reports/unit.xml"
+      },
+      "metrics": []
+    },
+    {
+      "id": "integration",
+      "name": "Integration tests",
+      "group": "Correctness",
+      "required": true,
+      "dependsOn": [
+        "unit"
+      ],
+      "command": {
+        "executable": "pnpm",
+        "arguments": [
+          "test:integration",
+          "--",
+          "--reporter=junit",
+          "--outputFile=reports/integration.xml"
+        ],
+        "workingDirectory": ".",
+        "timeoutMs": 60000,
+        "environmentReferences": []
+      },
+      "report": {
+        "adapter": "junit",
+        "adapterVersion": 1,
+        "path": "reports/integration.xml"
+      },
+      "metrics": []
+    },
+    {
+      "id": "browser",
+      "name": "Browser journeys",
+      "group": "Correctness",
+      "required": true,
+      "dependsOn": [
+        "integration"
+      ],
+      "command": {
+        "executable": "pnpm",
+        "arguments": [
+          "test:e2e",
+          "--",
+          "--reporter=junit"
+        ],
+        "workingDirectory": ".",
+        "timeoutMs": 120000,
+        "environmentReferences": []
+      },
+      "report": {
+        "adapter": "junit",
+        "adapterVersion": 1,
+        "path": "reports/browser.xml"
+      },
+      "metrics": []
+    },
+    {
+      "id": "latency",
+      "name": "Checkout response time",
+      "group": "Measurement",
+      "required": true,
+      "dependsOn": [
+        "browser",
+        "types",
+        "lint"
+      ],
+      "command": {
+        "executable": "pnpm",
+        "arguments": [
+          "benchmark:checkout"
+        ],
+        "workingDirectory": ".",
+        "timeoutMs": 120000,
+        "environmentReferences": []
+      },
+      "report": {
+        "adapter": "metrics-v1",
+        "adapterVersion": 1,
+        "path": "reports/checkout.json"
+      },
+      "metrics": [
+        {
+          "name": "p95_latency",
+          "unit": "ms",
+          "direction": "decrease",
+          "minimumImprovement": 5,
+          "maximumRegression": 0,
+          "minimumSamples": 60,
+          "guardrail": false
+        }
+      ]
+    }
+  ]
+}
