@@ -62,7 +62,7 @@ export function Dialog({
     <dialog
       ref={dialog}
       className={`dialog${wide ? ' dialog-wide' : ''}`}
-      aria-labelledby={`${id}-title`}
+      aria-label={title}
       aria-describedby={description ? `${id}-description` : undefined}
       aria-busy={busy}
       onKeyDown={(event) => {

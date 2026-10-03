@@ -71,6 +71,9 @@ const app = createApp({
     return repo;
   },
   connectionSecret: 'browser-fixture-secret',
+  settingsEnvironment: { OPENAI_API_KEY: 'browser-fixture-key' },
+  probeExecutor: async ({ model }) => { if (model === 'fixture-fail') throw new Error('Controlled provider failure'); return { inputTokens: 6, outputTokens: 1 }; },
+  modelExecutor: async () => ({ recommendations: [], plans: [] }),
   logger: false,
   dispatcher: false,
   storage: { dataDirectory: join(root, 'data') },

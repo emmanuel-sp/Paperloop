@@ -9,11 +9,13 @@ import {
 } from '@paperloop/contracts';
 import type { FastifyInstance } from 'fastify';
 import type { ScheduleService } from './schedule-service.js';
+import type { SettingsService } from '../runtime/settings-service.js';
 import type { AnalysisService } from '../analysis/analysis-service.js';
 export function registerScheduleRoutes(
   app: FastifyInstance,
   schedules: ScheduleService,
   analysis: AnalysisService,
+  settings: SettingsService,
 ) {
   const project = '/api/v1/projects/:id';
   const schedule = '/api/v1/schedules/:id';
@@ -125,7 +127,10 @@ export function registerScheduleRoutes(
   }));
   app.post<{ Params: { id: string } }>(
     `${project}/analysis/approve`,
-    async (req) =>
-      analysis.activate(req.params.id, apiActivationSchema.parse(req.body)),
+    async (req) => {
+      const activation = apiActivationSchema.parse(req.body);
+      settings.requireTest(req.params.id, activation);
+      return analysis.activate(req.params.id, activation);
+    },
   );
 }

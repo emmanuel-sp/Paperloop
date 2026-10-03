@@ -126,8 +126,11 @@ export const apiActivationSchema = z
     enabled: z.boolean(),
     provider: z.enum(['openai', 'anthropic']),
     model: z.string().trim().min(1).max(200),
+    maxOutputTokens: z.number().int().min(32).max(8000).default(1024),
+    dailyCallLimit: z.number().int().min(1).max(100).default(5),
   })
   .strict();
+export type ApiActivationInput = z.input<typeof apiActivationSchema>;
 export type ApiActivation = z.infer<typeof apiActivationSchema>;
 export const manualAnalysisSchema = z
   .object({
@@ -154,4 +157,24 @@ export const automationStatusSchema = z.object({
       evidence: z.string(),
     }),
   ),
+});
+
+export const workspacePreferencesSchema = scheduleConfigSchema.pick({ timezone: true, driver: true, mechanism: true, provider: true });
+export type WorkspacePreferences = z.infer<typeof workspacePreferencesSchema>;
+export const providerProbeSchema = z.object({
+  requestId: z.uuid(), provider: z.enum(['openai', 'anthropic']), model: z.string().max(200),
+  status: z.enum(['pending', 'succeeded', 'failed']),
+  inputTokens: z.number().int().nonnegative().nullable(), outputTokens: z.number().int().nonnegative().nullable(),
+  costUsd: z.number().nonnegative().nullable(), message: z.string(), createdAt: z.iso.datetime(),
+});
+export type ProviderProbe = z.infer<typeof providerProbeSchema>;
+export const connectionObservationSchema = z.object({
+  client: z.string().nullable(), initializedAt: z.iso.datetime().nullable(), toolsListedAt: z.iso.datetime().nullable(),
+});
+export const workspaceSettingsSchema = z.object({
+  preferences: workspacePreferencesSchema,
+  credentialPath: z.string(),
+  platform: z.string(),
+  connection: connectionObservationSchema,
+  providers: z.array(z.object({ provider: z.enum(['openai', 'anthropic']), keyAvailable: z.boolean(), probe: providerProbeSchema.nullable() })),
 });

@@ -2,12 +2,13 @@ import { and, eq } from 'drizzle-orm';
 import {
   apiActivationSchema,
   analysisOutputSchema,
-  type ApiActivation,
+  type ApiActivationInput,
   type AnalysisOutput,
 } from '@paperloop/contracts';
 import type { PaperloopDatabase } from '../storage/database.js';
 import {
   apiActivations,
+  appState,
   researchRecommendations,
   researchVersions,
 } from '../storage/schema.js';
@@ -37,20 +38,20 @@ export class AnalysisService {
       .from(apiActivations)
       .where(eq(apiActivations.projectId, projectId))
       .all()
-      .map((row) => row.payload);
+      .map((row) => apiActivationSchema.parse(row.payload));
   }
-  activate(projectId: string, input: ApiActivation) {
+  activate(projectId: string, input: ApiActivationInput) {
     this.projects.get(projectId);
-    input = apiActivationSchema.parse(input);
+    const activation = apiActivationSchema.parse(input);
     this.database.db
       .insert(apiActivations)
-      .values({ projectId, provider: input.provider, payload: input })
+      .values({ projectId, provider: activation.provider, payload: activation })
       .onConflictDoUpdate({
         target: [apiActivations.projectId, apiActivations.provider],
-        set: { payload: input },
+        set: { payload: activation },
       })
       .run();
-    return input;
+    return activation;
   }
   requireEnabled(projectId: string, provider: ModelProvider) {
     const input = this.database.db
@@ -173,11 +174,16 @@ export class AnalysisService {
     signal: AbortSignal,
   ) {
     const activation = this.requireEnabled(projectId, provider);
+    const key = `analysis-calls:${projectId}:${provider}:${new Date().toISOString().slice(0, 10)}`;
+    const count = Number(this.database.db.select().from(appState).where(eq(appState.key, key)).get()?.value ?? '0');
+    if (count >= (activation.dailyCallLimit ?? 5)) throw new WorkflowError('DAILY_CALL_LIMIT', 'The daily paid-call limit was reached. No automatic retry.');
+    this.database.db.insert(appState).values({ key, value: String(count + 1), updatedAt: new Date() }).onConflictDoUpdate({ target: appState.key, set: { value: String(count + 1), updatedAt: new Date() } }).run();
     return this.execute({
       provider,
       model: activation.model,
       context: this.context(projectId, documentIds),
       signal,
+      maxOutputTokens: activation.maxOutputTokens ?? 1024,
     });
   }
 }

@@ -70,3 +70,11 @@ client-specific troubleshooting and additional scopes.
 ## Scheduling
 
 See [Scheduling and automation](SCHEDULING.md) for native Codex/Claude handoffs, setup reports, observed check-ins, claim ownership, and bounded automation. Paperloop does not edit private agent configuration or install a native task merely by generating instructions.
+
+## Settings setup and verification
+
+Settings → Agent & API generates the actual local endpoint, client-specific configuration location, and a complete setup prompt for Codex or Claude Code. Merge only the Paperloop entry and preserve other MCP servers. The copied prompt contains the credential-file path and environment reference, never its value; read the protected startup file locally into the agent's launch environment without printing it.
+
+A reachable local service is distinct from a configured client. Paperloop records authenticated MCP initialization and tool-discovery observations, using the client’s reported identity. Historical tool discovery does not establish current agent activity. Windows/WSL clients must reach the same loopback endpoint; keep service and agent in the same distribution when forwarding is unavailable.
+
+Shared Preferences retain the initially browser-detected timezone and default driver, native mechanism, and provider across projects. Selecting a default provider neither installs a schedule nor activates paid analysis.

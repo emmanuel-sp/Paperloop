@@ -1,3 +1,4 @@
+import { SettingsWorkspace } from '../schedules/SettingsWorkspace';
 import { ScheduleWorkspace } from '../schedules/ScheduleWorkspace';
 import type { Project } from '@paperloop/contracts';
 import { Link, useSearchParams } from 'react-router';
@@ -93,7 +94,7 @@ export function ProjectWorkspace({
         </div>
       ) : activeTab === 'research' ? (
         <ResearchWorkspace key={project.id} projectId={project.id} />
-      ) : activeTab === 'schedules' || activeTab === 'settings' ? (
+      ) : activeTab === 'settings' ? <SettingsWorkspace projectId={project.id} /> : activeTab === 'schedules' ? (
         <ScheduleWorkspace
           key={`${project.id}-${activeTab}`}
           projectId={project.id}
