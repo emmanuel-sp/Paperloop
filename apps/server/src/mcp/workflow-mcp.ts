@@ -3,6 +3,7 @@ import {
   evaluationPlanDraftSchema,
   evaluationResultSchema,
   experimentRequestSchema,
+  implementationEvidenceSchema,
   evaluationPlanListSchema,
   evaluationPlanSchema,
   experimentListSchema,
@@ -138,9 +139,10 @@ export function registerWorkflowMcp(
       token: z.string(),
       message: z.string().min(1).max(10000),
       ready: z.boolean().default(false),
+      evidence: implementationEvidenceSchema.optional(),
     }),
-    ({ experimentId, token, message, ready }) =>
-      experiments.progress(experimentId, token, message, ready),
+    ({ experimentId, token, message, ready, evidence }) =>
+      experiments.progress(experimentId, token, message, ready, evidence),
   );
   tool(
     'experiments_reconcile',

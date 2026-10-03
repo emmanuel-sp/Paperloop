@@ -4,6 +4,7 @@ import {
   evaluationSuggestionSchema,
   evaluationResultSchema,
   experimentRequestSchema,
+  implementationEvidenceSchema,
 } from '@paperloop/contracts';
 import type { FastifyInstance } from 'fastify';
 import type { EvaluationSuggestionService } from '../evaluations/suggestion-service.js';
@@ -91,6 +92,7 @@ export function registerWorkflowRoutes(
           token: z.string(),
           message: z.string().min(1).max(10000),
           ready: z.boolean().default(false),
+          evidence: implementationEvidenceSchema.optional(),
         })
         .parse(request.body);
       return experiments.progress(
@@ -98,6 +100,7 @@ export function registerWorkflowRoutes(
         input.token,
         input.message,
         input.ready,
+        input.evidence,
       );
     },
   );

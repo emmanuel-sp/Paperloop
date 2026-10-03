@@ -119,10 +119,10 @@ test('browser approval through a complete paid-call-free Python comparison', asy
   );
   const implemented = await page.request.post(`/__test/implement/${id}`);
   expect(implemented.ok()).toBe(true);
-  await expect(page.getByRole('button', { name: 'Run candidate' })).toBeEnabled(
+  await expect(page.getByRole('button', { name: 'Evaluate candidate' })).toBeEnabled(
     { timeout: 15000 },
   );
-  await page.getByRole('button', { name: 'Run candidate' }).click();
+  await page.getByRole('button', { name: 'Evaluate candidate' }).click();
   await expect(page.getByText('score: 12 points', { exact: true })).toBeVisible(
     { timeout: 20000 },
   );
@@ -1003,4 +1003,29 @@ test('repository test suggestion becomes an unapproved contextual Evaluation bef
   await expect(preparation.getByRole('heading', { name: 'Suggestion context paper', exact: true })).toBeVisible();
   await expect(preparation.getByRole('combobox', { name: 'Paper', exact: true })).toHaveCount(0);
   await expect(page).toHaveURL(/angle=Grounded/);
+});
+
+
+test('implementation stage shows observed ownership and structured readiness before candidate Evaluation', async ({ page }) => {
+  await connect(page);
+  const projectId = page.url().split('/projects/')[1]!.split('/')[0]!;
+  const paper = await (await page.request.post(`/api/v1/projects/${projectId}/research`, { data: { title: 'Lifecycle context paper', sourceKind: 'reference', sourceReference: 'Lifecycle fixture', extractionStatus: 'unavailable' } })).json();
+  const plans = await (await page.request.get(`/api/v1/projects/${projectId}/evaluations`)).json();
+  const approved = plans.plans.find((plan: { approvedAt: string | null }) => plan.approvedAt);
+  const prepared = await (await page.request.post(`/api/v1/projects/${projectId}/experiments`, { data: { documentId: paper.id, planId: approved.id } })).json();
+  const id = prepared.experiment.id;
+  await page.goto(`/projects/${projectId}/experiments?experiment=${id}`);
+  await expect(page.getByRole('list', { name: 'Experiment lifecycle' })).toBeVisible();
+  await expect(page.getByText('No agent has claimed this attempt', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Evaluate candidate', exact: true })).toBeDisabled();
+  const claimed = await (await page.request.post(`/api/v1/experiments/${id}/claim`, { data: { owner: 'Observed browser coding agent' } })).json();
+  await expect(page.getByText('Observed browser coding agent', { exact: true })).toBeVisible();
+  await page.request.post(`/api/v1/experiments/${id}/progress`, { data: { token: claimed.experiment.claimToken, message: 'Candidate implementation prepared', ready: true, evidence: { summary: 'Applied the research technique', changedFiles: ['score.txt'], checks: ['Reviewed candidate change'], limitations: ['Evaluation not yet run'] } } });
+  await expect(page.getByRole('heading', { name: 'Agent-reported implementation', exact: true })).toBeVisible();
+  await expect(page.getByText('Applied the research technique', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Evaluate candidate', exact: true })).toBeEnabled();
+  await page.screenshot({ path: 'test-results/foundations/implementation-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/foundations/implementation-mobile.png', fullPage: true });
 });

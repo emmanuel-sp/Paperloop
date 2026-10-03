@@ -44,3 +44,9 @@ Research actions carry the originating paper, recommendation, and angle into pre
 Evaluation offers the current project configuration for explicit relevance review, a validated local `paperloop.evaluation.json` contract, or a bounded `package.json` test-suite guardrail. Repository metadata is read without executing it or following document symlinks. A test-suite suggestion measures the real command exit outcome only; it does not claim research quality or improvement. Unsupported capabilities and missing metrics/results contracts prompt agent-assisted or deliberate custom setup.
 
 Using a suggestion persists an unapproved draft or reuses an identical version, with paper/angle/project provenance. Changed measurement contracts produce new fingerprints and require fresh approval. Suggestions, acceptance, and contextual preparation never grant command approval or paid activation. The approved test adapter is shipped with the local service and writes the normal result protocol from observed outcomes.
+
+## Visible implementation lifecycle
+
+Experiments show Prepare → Measure baseline → Implement → Evaluate candidate → Review, with individual run states alongside the agent lifecycle. The handoff names the pinned paper/context/brief, approved Evaluation, isolated candidate, claim/check-in protocol, and constraints. Copying the task does not launch an agent.
+
+Claims and heartbeats retain actual check-in timestamps. Expired claims become interrupted when observed; they require inspection and reconciliation instead of displaying indefinite activity. `experiments_progress` accepts optional structured `evidence` with summary, changedFiles, checks, and limitations. Ready reports without structured evidence retain the agent's supplied message as the summary and show missing change/check evidence honestly. Readiness is not a measurement or permission to merge.

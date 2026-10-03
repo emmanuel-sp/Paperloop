@@ -82,6 +82,14 @@ export const evaluationResultSchema = z
   })
   .strict();
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
+export const implementationEvidenceSchema = z.object({
+  summary: z.string().trim().min(1).max(10000),
+  changedFiles: z.array(text).max(100).default([]),
+  checks: z.array(text).max(50).default([]),
+  limitations: z.array(text).max(50).default([]),
+}).strict();
+export type ImplementationEvidence = z.infer<typeof implementationEvidenceSchema>;
+
 export const experimentRequestSchema = z
   .object({
     documentId: z.uuid(),
@@ -111,6 +119,8 @@ export const experimentSchema = z.object({
   claimToken: z.string().nullable(),
   claimOwner: z.string().nullable(),
   claimExpiresAt: z.iso.datetime().nullable(),
+  lastAgentCheckIn: z.iso.datetime().nullable().optional(),
+  implementationSummary: implementationEvidenceSchema.nullable().optional(),
   progress: z.string(),
   reconciliation: z.string().nullable(),
   createdAt: z.iso.datetime(),
