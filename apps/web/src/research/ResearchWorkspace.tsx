@@ -2,15 +2,19 @@ import { AutoTextarea } from '../components/AutoTextarea';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  IngestResearchDocumentRequest,
+  ResearchImportCommit,
+  ResearchImportPreview,
   ResearchDocument,
-  ResearchSourceKind,
 } from '@paperloop/contracts';
 import {
-  ingestResearchDocument,
+  request,
   getResearchContent,
   listResearchDocuments,
 } from '../api/client';
+import {
+  researchImportPreviewSchema,
+  researchDocumentSchema,
+} from '@paperloop/contracts';
 import { Dialog } from '../components/Dialog';
 import { Field } from '../components/Field';
 import { SourceWorkspace } from './SourceWorkspace';
@@ -52,8 +56,13 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
     queryFn: () => listResearchDocuments(projectId),
   });
   const mutation = useMutation({
-    mutationFn: (input: IngestResearchDocumentRequest) =>
-      ingestResearchDocument(projectId, input),
+    mutationFn: async (input: ResearchImportCommit) =>
+      researchDocumentSchema.parse(
+        await request(`/api/v1/projects/${projectId}/research/import/commit`, {
+          method: 'POST',
+          body: JSON.stringify(input),
+        }),
+      ),
     onSuccess: async (document) => {
       setParams((previous) => {
         const updated = new URLSearchParams(previous);
@@ -130,7 +139,11 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
       >
         <div className="research-stack">
           <RecommendationPanel projectId={projectId} onSelect={setSelectedId} />
-          <DiscoveryPanel projectId={projectId} documents={documents} onSelect={setSelectedId} />
+          <DiscoveryPanel
+            projectId={projectId}
+            documents={documents}
+            onSelect={setSelectedId}
+          />
         </div>
         {selectedId ? (
           <PaperDetail
@@ -166,6 +179,8 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
         onClose={closeSecondary}
       >
         <PaperForm
+          key={`${projectId}-${rawView}`}
+          projectId={projectId}
           error={
             mutation.isError ? messageFromError(mutation.error) : undefined
           }
@@ -178,105 +193,217 @@ export function ResearchWorkspace({ projectId }: { projectId: string }) {
 }
 
 function PaperForm({
+  projectId,
   error,
   isPending,
   onSubmit,
 }: {
+  projectId: string;
   error: string | undefined;
   isPending: boolean;
-  onSubmit(input: IngestResearchDocumentRequest): void;
+  onSubmit(input: ResearchImportCommit): void;
 }) {
+  const [input, setInput] = useState('');
+  const [file, setFile] = useState<{
+    name: string;
+    contentType: string;
+    data: string;
+  }>();
+  const [fileError, setFileError] = useState('');
+  const [preview, setPreview] = useState<ResearchImportPreview>();
   const [title, setTitle] = useState('');
-  const [sourceKind, setSourceKind] = useState<ResearchSourceKind>('url');
-  const [sourceReference, setSourceReference] = useState('');
-  const [extractedContent, setExtractedContent] = useState('');
-
+  const [authors, setAuthors] = useState('');
+  const [content, setContent] = useState('');
+  const lookup = useMutation({
+    mutationFn: async () =>
+      researchImportPreviewSchema.parse(
+        await request(`/api/v1/projects/${projectId}/research/import/preview`, {
+          method: 'POST',
+          body: JSON.stringify({ input, file }),
+        }),
+      ),
+    onSuccess: (result) => {
+      setPreview(result);
+      setTitle(result.document.title);
+      setAuthors(result.document.authors.join('\n'));
+    },
+  });
+  const busy = lookup.isPending || isPending;
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSubmit({
-      title,
-      sourceKind,
-      sourceReference,
-      extractionStatus: extractedContent.trim() ? 'complete' : 'pending',
-      ...(extractedContent.trim() ? { extractedContent } : {}),
-      authors: [],
-      submittedBy: 'user',
-    });
+    if (!preview) lookup.mutate();
+    else
+      onSubmit({
+        previewId: preview.id,
+        title,
+        authors: authors
+          .split('\n')
+          .map((value) => value.trim())
+          .filter(Boolean),
+        ...(content.trim() ? { extractedContent: content } : {}),
+      });
   }
-
   return (
-    <section className="detail-panel research-form-card">
-      <p className="eyebrow">Add research</p>
-      <h2>Add a paper</h2>
-      <form className="research-form" onSubmit={submit}>
-        <Field
-          label="Title"
-          hint="Use the paper’s title so you can recognize it later."
-        >
-          {(attributes) => (
-            <input
-              name="title"
-              autoComplete="off"
-              {...attributes}
-              onChange={(event) => setTitle(event.target.value)}
-              required
-              value={title}
-            />
-          )}
-        </Field>
-        <div className="form-columns">
-          <label>
-            Reference type
-            <select
-              name="sourceKind"
-              autoComplete="off"
-              onChange={(event) =>
-                setSourceKind(event.target.value as ResearchSourceKind)
-              }
-              value={sourceKind}
-            >
-              <option value="url">URL</option>
-              <option value="arxiv">arXiv ID</option>
-              <option value="reference">Citation / reference</option>
-            </select>
-          </label>
-        </div>
-        <label>
-          URL or reference
-          <input
-            name="sourceReference"
-            autoComplete="off"
-            onChange={(event) => setSourceReference(event.target.value)}
-            required
-            value={sourceReference}
-          />
-        </label>
-        <details>
-          <summary>Add text manually (optional)</summary>
-          <label>
-            Paper text
-            <AutoTextarea
-              name="extractedContent"
-              autoComplete="off"
-              onChange={(event) => setExtractedContent(event.target.value)}
-              placeholder="Paste the paper text if it cannot be fetched from the source."
-              rows={5}
-              value={extractedContent}
-            />
-          </label>
-        </details>
-        {error ? (
-          <p className="form-error" role="alert">
-            {error}
+    <form className="research-form" onSubmit={submit}>
+      {!preview ? (
+        <>
+          <Field
+            label="Paper reference or text"
+            hint="Paste a URL, arXiv ID, DOI, citation, or paper text."
+          >
+            {(attributes) => (
+              <AutoTextarea
+                {...attributes}
+                rows={4}
+                value={input}
+                disabled={busy || Boolean(file)}
+                onChange={(event) => setInput(event.target.value)}
+                required={!file}
+              />
+            )}
+          </Field>
+          <Field
+            label="Or upload a file"
+            hint="PDF or plain text, up to 1 MiB."
+          >
+            {(attributes) => (
+              <input
+                {...attributes}
+                type="file"
+                accept=".pdf,.txt,application/pdf,text/plain"
+                disabled={busy}
+                onChange={(event) => {
+                  const selected = event.target.files?.[0];
+                  setFile(undefined);
+                  setFileError('');
+                  if (!selected) return;
+                  if (selected.size > 1024 * 1024 || !selected.size) {
+                    setFileError('Choose a nonempty file up to 1 MiB.');
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setInput('');
+                    setFile({
+                      name: selected.name,
+                      contentType: selected.type,
+                      data: String(reader.result).split(',')[1]!,
+                    });
+                  };
+                  reader.onerror = () =>
+                    setFileError('The file could not be read.');
+                  reader.readAsDataURL(selected);
+                }}
+              />
+            )}
+          </Field>
+        </>
+      ) : (
+        <section className="research-stack import-preview">
+          <p className="eyebrow">Import preview · {preview.inputKind}</p>
+          <h3>{preview.document.title}</h3>
+          <p className="muted">
+            {preview.document.authors.join(', ') || 'Authors not identified'}
           </p>
-        ) : null}
-        <div className="form-actions">
-          <button className="button primary" disabled={isPending} type="submit">
-            {isPending ? 'Saving…' : 'Save paper'}
+          <p>
+            {preview.document.sourceReference}
+            {preview.document.sourceVersion
+              ? ` · ${preview.document.sourceVersion}`
+              : ''}
+          </p>
+          <WorkflowStatus value={preview.document.extractionStatus} />
+          {preview.document.extractedContent ? (
+            <p>
+              {preview.document.extractedContent.slice(0, 500)}
+              {preview.document.extractedContent.length > 500 ? '…' : ''}
+            </p>
+          ) : null}
+          {preview.duplicateId ? (
+            <p role="status">
+              This paper is already in the library. Saving reuses its existing
+              record.
+            </p>
+          ) : null}
+          <ul>
+            {preview.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+          {preview.document.extractionError ? (
+            <p role="status">{preview.document.extractionError}</p>
+          ) : null}
+          <details>
+            <summary>Correct metadata or add text</summary>
+            <Field label="Title">
+              {(attributes) => (
+                <input
+                  {...attributes}
+                  value={title}
+                  required
+                  maxLength={500}
+                  onChange={(event) => setTitle(event.target.value)}
+                />
+              )}
+            </Field>
+            <Field label="Authors" hint="One author per line.">
+              {(attributes) => (
+                <AutoTextarea
+                  {...attributes}
+                  rows={2}
+                  value={authors}
+                  onChange={(event) => setAuthors(event.target.value)}
+                />
+              )}
+            </Field>
+            <Field
+              label="Paper text"
+              hint="Optional fallback when source text is unavailable."
+            >
+              {(attributes) => (
+                <AutoTextarea
+                  {...attributes}
+                  rows={4}
+                  value={content}
+                  maxLength={500_000}
+                  onChange={(event) => setContent(event.target.value)}
+                />
+              )}
+            </Field>
+          </details>
+          <button
+            type="button"
+            className="button tertiary"
+            disabled={busy}
+            onClick={() => {
+              setPreview(undefined);
+              setContent('');
+            }}
+          >
+            Change input
           </button>
-        </div>
-      </form>
-    </section>
+        </section>
+      )}
+      {fileError || error || lookup.isError ? (
+        <p className="form-error" role="alert">
+          {fileError || error || messageFromError(lookup.error)}
+        </p>
+      ) : null}
+      <div className="form-actions">
+        <button
+          className="button primary"
+          disabled={busy || Boolean(fileError)}
+          type="submit"
+        >
+          {busy
+            ? lookup.isPending
+              ? 'Reading paper…'
+              : 'Saving…'
+            : preview
+              ? 'Save paper'
+              : 'Preview import'}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -320,6 +447,16 @@ function PaperDetail({
         </div>
         <WorkflowStatus value={document.extractionStatus} />
       </div>
+      {document.importNotes?.length ? (
+        <details>
+          <summary>Import provenance</summary>
+          <ul>
+            {document.importNotes.map((note, index) => (
+              <li key={`${index}-${note}`}>{note}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
       <p className="muted">
         {document.authors.join(', ') || 'Authors not recorded'}
       </p>

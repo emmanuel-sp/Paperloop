@@ -1,5 +1,8 @@
 import {
   ingestResearchDocumentRequestSchema,
+  researchImportInputSchema,
+  researchImportPreviewSchema,
+  researchImportCommitSchema,
   readResearchContentRequestSchema,
   researchContentPageSchema,
   researchDocumentListResponseSchema,
@@ -7,6 +10,7 @@ import {
   storeImplementationBriefRequestSchema,
 } from '@paperloop/contracts';
 import type { FastifyInstance } from 'fastify';
+import type { ResearchImportService } from './import-service.js';
 import type { ResearchService } from './research-service.js';
 
 interface ProjectParameters {
@@ -20,7 +24,34 @@ interface DocumentParameters extends ProjectParameters {
 export function registerResearchRoutes(
   app: FastifyInstance,
   research: ResearchService,
+  imports: ResearchImportService,
 ): void {
+  app.post<{ Params: ProjectParameters }>(
+    '/api/v1/projects/:id/research/import/preview',
+    { bodyLimit: 2 * 1024 * 1024 },
+    async (request) =>
+      researchImportPreviewSchema.parse(
+        await imports.preview(
+          request.params.id,
+          researchImportInputSchema.parse(request.body),
+        ),
+      ),
+  );
+  app.post<{ Params: ProjectParameters }>(
+    '/api/v1/projects/:id/research/import/commit',
+    async (request, reply) =>
+      reply
+        .code(201)
+        .send(
+          researchDocumentSchema.parse(
+            imports.commit(
+              request.params.id,
+              researchImportCommitSchema.parse(request.body),
+            ),
+          ),
+        ),
+  );
+
   app.get<{ Params: ProjectParameters }>(
     '/api/v1/projects/:id/research',
     async (request) =>

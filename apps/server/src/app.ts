@@ -31,6 +31,7 @@ import {
   SourceFetchError,
   type PublicFetcher,
 } from './research/public-fetch.js';
+import { ResearchImportService } from './research/import-service.js';
 import { registerResearchRoutes } from './research/research-routes.js';
 import {
   ResearchDocumentNotFoundError,
@@ -227,7 +228,7 @@ export function createApp(options: CreateAppOptions = {}) {
   const github = new GithubService(options.githubApi);
   registerGithubRoutes(app, github);
   registerProjectRoutes(app, projectService, github);
-  registerResearchRoutes(app, researchService);
+  registerResearchRoutes(app, researchService, new ResearchImportService(projectService, researchService, options.researchFetcher));
   registerDiscoveryRoutes(app, discovery, researchService);
   registerWorkflowRoutes(app, plans, experiments);
   registerScheduleRoutes(app, schedules, analysis);

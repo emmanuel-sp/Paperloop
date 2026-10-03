@@ -25,6 +25,9 @@ export async function extractResource(
       });
       try {
         const pdf = await task.promise;
+        const metadata = await pdf.getMetadata().catch(() => null);
+        const info = metadata?.info as { Title?: string } | undefined;
+        const title = info?.Title?.trim().slice(0, 500);
         const pages: string[] = [];
         let length = 0;
         const count = Math.min(pdf.numPages, 200);
@@ -52,6 +55,7 @@ export async function extractResource(
           length >= maximumCharacters ||
           pages.some((page) => !page.trim());
         return {
+          ...(title ? { title } : {}),
           status: partial ? 'partial' : 'complete',
           content,
           ...(partial

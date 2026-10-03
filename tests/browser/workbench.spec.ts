@@ -242,26 +242,30 @@ test('focused dialogs contain focus, restore triggers, dismiss, and preserve fai
     name: 'Import paper',
     exact: true,
   });
-  const title = paperDialog.getByLabel('Title', { exact: true });
-  await title.fill('Synthetic dialog validation fixture');
-  await expect(title).toHaveAttribute('aria-describedby', /hint/);
-  await paperDialog.getByRole('button', { name: 'Save paper' }).click();
+  const reference = paperDialog.getByLabel('Paper reference or text');
+  await paperDialog.getByRole('button', { name: 'Preview import' }).click();
   await expect(paperDialog).toBeVisible();
-  await expect(title).toHaveValue('Synthetic dialog validation fixture');
-  expect(
-    await paperDialog
-      .getByLabel('URL or reference')
-      .evaluate((input: HTMLInputElement) => input.validity.valueMissing),
-  ).toBe(true);
-  await paperDialog.getByLabel('Reference type').selectOption('reference');
-  await paperDialog
-    .getByLabel('URL or reference')
-    .fill('Synthetic browser test, not a publication');
+  await reference.fill(
+    'Synthetic dialog validation fixture\nSynthetic browser test, not a publication',
+  );
+  await paperDialog.getByRole('button', { name: 'Preview import' }).click();
+  await expect(
+    paperDialog.getByRole('heading', {
+      name: 'Synthetic dialog validation fixture',
+    }),
+  ).toBeVisible();
+  await page.screenshot({ path: 'test-results/foundations/import-preview-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await paperDialog.locator('.dialog-body').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/foundations/import-preview-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await paperDialog.getByText('Correct metadata or add text').click();
+  const title = paperDialog.getByLabel('Title', { exact: true });
   let release: () => void = () => {};
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route('**/api/v1/projects/*/research', async (route) => {
+  await page.route('**/api/v1/projects/*/research/import/commit', async (route) => {
     if (route.request().method() !== 'POST') return route.continue();
     await gate;
     return route.fulfill({
@@ -286,7 +290,7 @@ test('focused dialogs contain focus, restore triggers, dismiss, and preserve fai
     'Controlled save failure',
   );
   await expect(title).toHaveValue('Synthetic dialog validation fixture');
-  await page.unroute('**/api/v1/projects/*/research');
+  await page.unroute('**/api/v1/projects/*/research/import/commit');
   await paperDialog.getByRole('button', { name: 'Save paper' }).click();
   await expect(paperDialog).not.toBeVisible();
   await expect(

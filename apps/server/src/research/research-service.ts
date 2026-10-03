@@ -13,6 +13,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { ProjectService } from '../projects/project-service.js';
 import type { PaperloopDatabase } from '../storage/database.js';
 import {
+  appState,
   implementationBriefs,
   projectResearchDocuments,
   researchDocuments,
@@ -118,15 +119,15 @@ export class ResearchService {
       newNumber < oldNumber;
     const versionChanged = Boolean(
       existing &&
-      input.sourceVersion &&
-      input.sourceVersion !== existing.sourceVersion,
+        input.sourceVersion &&
+        input.sourceVersion !== existing.sourceVersion,
     );
     const preserveExtraction = Boolean(
       existing &&
-      !versionChanged &&
-      (input.extractionStatus === 'pending' ||
-        (existing.extractionStatus === 'complete' &&
-          input.extractionStatus === 'partial')),
+        !versionChanged &&
+        (input.extractionStatus === 'pending' ||
+          (existing.extractionStatus === 'complete' &&
+            input.extractionStatus === 'partial')),
     );
     const status =
       olderVersion || preserveExtraction
@@ -386,6 +387,29 @@ export class ResearchService {
     };
   }
 
+  findIdentity(sourceKind: string, sourceReference: string): string | null {
+    const row = this.database.sqlite
+      .prepare(
+        'SELECT id FROM research_documents WHERE source_kind = ? AND source_reference = ?',
+      )
+      .get(sourceKind, sourceReference) as { id: string } | undefined;
+    return row?.id ?? null;
+  }
+  recordImport(projectId: string, documentId: string, notes: string[]) {
+    this.get(projectId, documentId);
+    const key = `research-import:${projectId}:${documentId}`;
+    const value = JSON.stringify(notes);
+    this.database.db
+      .insert(appState)
+      .values({ key, value, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: appState.key,
+        set: { value, updatedAt: new Date() },
+      })
+      .run();
+    return this.get(projectId, documentId);
+  }
+
   searchLibrary(input: LibrarySearchRequest, projectId?: string) {
     if (projectId) this.projects.get(projectId);
     const tokens = input.query.match(/[\p{L}\p{N}_]+/gu) ?? [];
@@ -527,6 +551,13 @@ export class ResearchService {
       extractionError: row.extractionError,
       submittedBy: membership.submittedBy,
       retrievedAt: row.retrievedAt?.toISOString() ?? null,
+      importNotes: JSON.parse(
+        this.database.db
+          .select()
+          .from(appState)
+          .where(eq(appState.key, `research-import:${projectId}:${row.id}`))
+          .get()?.value ?? '[]',
+      ) as string[],
       currentBrief: this.currentBrief(projectId, row.id),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
