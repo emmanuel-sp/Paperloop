@@ -2,9 +2,10 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
-  evaluationResultSchema,
+  legacyEvaluationResultSchema,
+  isEvaluationSuite,
   type EvaluationPlan,
-  type EvaluationResult,
+  type LegacyEvaluationResult,
 } from '@paperloop/contracts';
 import { within } from '../experiments/workspaces.js';
 import { confirmProcessGroupStopped } from './process-group.js';
@@ -13,7 +14,7 @@ export interface Execution {
   cancel(): void;
   done: Promise<{
     status: 'completed' | 'failed' | 'timed_out' | 'cancelled' | 'interrupted';
-    result: EvaluationResult | null;
+    result: LegacyEvaluationResult | null;
     error: string | null;
     exitCode: number | null;
     artifacts: string[];
@@ -24,7 +25,10 @@ export function executePlan(
   workspace: string,
   artifactDirectory: string,
 ): Execution {
-  const command = plan.configuration.command;
+  if (isEvaluationSuite(plan.configuration))
+    throw new Error('Layered Evaluation execution is not available yet.');
+  const configuration = plan.configuration;
+  const command = configuration.command;
   const cwd = within(workspace, command.workingDirectory);
   mkdirSync(artifactDirectory, { recursive: true, mode: 0o700 });
   const resultPath = resolve(cwd, command.resultPath);
@@ -116,11 +120,14 @@ export function executePlan(
         });
         return;
       }
-      let result: EvaluationResult | null = null;
+      let result: LegacyEvaluationResult | null = null;
       let error: string | null = null;
       let status:
-        'completed' | 'failed' | 'timed_out' | 'cancelled' | 'interrupted' =
-        stop ?? 'failed';
+        | 'completed'
+        | 'failed'
+        | 'timed_out'
+        | 'cancelled'
+        | 'interrupted' = stop ?? 'failed';
       const artifacts: string[] = ['stdout.log', 'stderr.log'];
       if (!stopped) {
         status = 'interrupted';
@@ -136,10 +143,10 @@ export function executePlan(
           const stat = statSync(checked);
           if (stat.mtimeMs === previousMtime || stat.size > 2_000_000)
             throw new Error('Result is stale or exceeds 2 MB.');
-          result = evaluationResultSchema.parse(
+          result = legacyEvaluationResultSchema.parse(
             JSON.parse(readFileSync(checked, 'utf8')),
           );
-          for (const criterion of plan.configuration.metrics) {
+          for (const criterion of configuration.metrics) {
             const metric = result.metrics.find(
               (metric) => metric.name === criterion.name,
             );

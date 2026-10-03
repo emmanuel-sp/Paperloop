@@ -421,3 +421,64 @@ application/ML/fallback/failure and narrow/short exact-step captures were inspec
 Lint and `git diff --check` passed. No application source or runtime schema changed;
 production suite contracts, execution and editor acceptance remain unverified until
 phases B–E implement and test them.
+
+## Phase B implementation checkpoint
+
+The shared draft/result contracts now retain the unchanged absent-version v1
+shape and add explicit version 2 suites. Both illustrative configurations above
+validate against the production contracts. New suite fingerprints sort object
+keys recursively after parsing/defaulting, preserve array order, and freeze the
+configuration at plan creation. Legacy hashes retain their original JSON
+serialization. Approval also verifies that stored configuration still matches
+its recorded fingerprint; drafting any revised suite creates an unapproved
+immutable version.
+
+Suite contracts bound checks, dependencies, adapters, metrics, coverage policies,
+paths, and overall/per-check timeouts. Optional `coverage` specifies
+`minimumCases`, `suiteIds`, `identityPolicy: "stable-id"`, and
+`skippedCases: "unknown" | "allow"` (default unknown). A metrics-v1 report may
+explicitly name a `cases-v1` sidecar through `report.cases` with adapterVersion 1
+and a relative path. Its envelope is `{ schemaVersion: 1, datasetIdentity,
+cases }`; each case supplies id, label, status, optional suiteId, rawIdentifiers,
+identityStatus (stable or ambiguous), reason, and finite named value/unit metrics.
+This schema does not interpret existing arbitrary `cases.json` artifacts.
+
+Database version 7 adds separate run-check and case tables. Internal harness
+storage can initialize every approved check, retain specification hashes and
+effective identities, append case evidence atomically, and preserve terminal
+checks/partial cases while interrupting unfinished checks on restart. It rejects
+specification/provenance mutation, duplicate case IDs, writes after completion,
+and more than 10,000 cases/check or 50,000 cases/run. This is storage preparation,
+not a runnable suite harness or external import validator.
+
+Authenticated read endpoints are:
+
+- `GET /api/v1/runs/:id/checks`: ordered specifications and check evidence;
+  legacy runs return an empty checks array.
+- `GET /api/v1/runs/:id/checks/:checkId/cases?limit=100&status=failed&cursor=...`:
+  stored cases, filtered total, and nextCursor. Limit is 1–100. Preserve the same
+  run, check and status filter for the cursor; records use append-only ordinals.
+
+MCP exposes equivalent read-only `evaluations_run_checks` and
+`evaluations_run_cases` tools. Draft/list/get, suggestions from bounded repository
+manifests (256 KB), analysis output and scheduled submissions use the shared
+v1/v2 union. MCP still has no approval tool. No HTTP/MCP case-writing endpoint
+exists. Runtime writes and aggregate verdict validation belong to phase C.
+
+Until phase C, suites are inspectable in Evaluation but have no workbench approval
+button or implementation shortcut. Exact API approval remains version-bound;
+even an approved suite cannot prepare an experiment, activate an automation
+rule, run, import external evidence or compute a comparison. These operations
+return an explicit unavailable error before preparing workspaces, reserving an
+attempt or spawning a process. The legacy runner parses only schemaVersion 1
+results; v2 evidence cannot satisfy a legacy plan. Existing v1 approvals, results,
+comparisons and registered artifacts remain unchanged through migration.
+
+Verification covers both design examples, invalid dependencies/versions/adapters/
+paths/bounds, exact approval and legacy fingerprint compatibility, migration,
+restart preservation, hundreds of cases and stable paging, HTTP/MCP contracts,
+and suite inspection across the six shared viewports. Phase C still must implement
+report parsing, serial execution, process stopping, overall bounds, artifact/log
+budgets, coverage semantics, external provenance validation and trustworthy
+aggregate/comparison decisions. Phase D owns the agent-led explanation/correction
+and executable approval workflow; #47/#46 integration follows those phases.

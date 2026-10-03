@@ -77,7 +77,7 @@ export class AutomationService {
   approveRule(projectId: string, input: AutomationRule) {
     this.projects.get(projectId);
     const rule = automationRuleSchema.parse(input);
-    const plan = this.plans.requireApproved(rule.planId);
+    const plan = this.plans.requireExecutable(rule.planId);
     if (plan.projectId !== projectId)
       throw new WorkflowError(
         'WRONG_PROJECT',
@@ -115,7 +115,7 @@ export class AutomationService {
           'AUTOMATION_PLAN_MISMATCH',
           'Use the exact approved rule plan.',
         );
-      this.plans.requireApproved(rule.planId);
+      this.plans.requireExecutable(rule.planId);
       const recommendation = this.database.db
         .select()
         .from(researchRecommendations)

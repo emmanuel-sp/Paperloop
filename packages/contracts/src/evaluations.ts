@@ -16,7 +16,7 @@ export const metricCriterionSchema = z
     guardrail: z.boolean().default(false),
   })
   .strict();
-export const evaluationPlanDraftSchema = z
+export const legacyEvaluationPlanDraftSchema = z
   .object({
     name: text,
     datasetIdentity: text,
@@ -46,6 +46,161 @@ export const evaluationPlanDraftSchema = z
     environmentIdentity: text,
   })
   .strict();
+const suiteRelativePath = relativePath.refine(
+  (value) =>
+    !/^(?:[A-Za-z]:|\\\\)/.test(value) &&
+    !value.includes('\\') &&
+    !value.includes('\0'),
+  'Use a relative workspace path with forward slashes.',
+);
+const checkId = z.string().regex(/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}$/);
+const uniqueIds = z
+  .array(checkId)
+  .max(50)
+  .refine(
+    (ids) => new Set(ids).size === ids.length,
+    'Identifiers must be unique.',
+  );
+export const suiteReportSchema = z.discriminatedUnion('adapter', [
+  z
+    .object({ adapter: z.literal('exit-code'), adapterVersion: z.literal(1) })
+    .strict(),
+  z
+    .object({
+      adapter: z.literal('junit'),
+      adapterVersion: z.literal(1),
+      path: suiteRelativePath,
+    })
+    .strict(),
+  z
+    .object({
+      adapter: z.literal('metrics-v1'),
+      adapterVersion: z.literal(1),
+      path: suiteRelativePath,
+      cases: z
+        .object({
+          adapter: z.literal('cases-v1'),
+          adapterVersion: z.literal(1),
+          path: suiteRelativePath,
+        })
+        .strict()
+        .optional(),
+    })
+    .strict(),
+]);
+export const suiteCheckSchema = z
+  .object({
+    id: checkId,
+    name: text,
+    group: text,
+    required: z.boolean(),
+    dependsOn: uniqueIds.default([]),
+    command: legacyEvaluationPlanDraftSchema.shape.command
+      .omit({ resultPath: true })
+      .extend({ workingDirectory: suiteRelativePath.default('.') }),
+    report: suiteReportSchema,
+    metrics: z
+      .array(metricCriterionSchema)
+      .max(100)
+      .default([])
+      .refine(
+        (metrics) =>
+          new Set(metrics.map((m) => m.name)).size === metrics.length,
+        'Metric names must be unique within a check.',
+      ),
+    datasetIdentity: text.optional(),
+    environmentIdentity: text.optional(),
+    coverage: z
+      .object({
+        suiteIds: z
+          .array(text)
+          .max(100)
+          .default([])
+          .refine(
+            (ids) => new Set(ids).size === ids.length,
+            'Suite identities must be unique.',
+          ),
+        minimumCases: z.number().int().min(1).max(10000),
+        identityPolicy: z.literal('stable-id'),
+        skippedCases: z.enum(['unknown', 'allow']).default('unknown'),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((check, ctx) => {
+    if (check.metrics.length && check.report.adapter !== 'metrics-v1')
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Metric criteria require a metrics-v1 report.',
+        path: ['metrics'],
+      });
+    if (
+      check.coverage &&
+      (check.report.adapter === 'exit-code' ||
+        (check.report.adapter === 'metrics-v1' && !check.report.cases))
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Coverage requires a case report.',
+        path: ['coverage'],
+      });
+  });
+export function freezeEvaluationConfiguration<T>(value: T): T {
+  if (value && typeof value === 'object') {
+    for (const child of Object.values(value))
+      freezeEvaluationConfiguration(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+export const evaluationSuiteDraftSchema = z
+  .object({
+    formatVersion: z.literal(2),
+    name: text,
+    datasetIdentity: text,
+    environmentIdentity: text,
+    overallTimeoutMs: z.number().int().min(100).max(3600000),
+    checks: z.array(suiteCheckSchema).min(1).max(50),
+  })
+  .strict()
+  .superRefine((suite, ctx) => {
+    const seen = new Set<string>();
+    suite.checks.forEach((check, index) => {
+      if (seen.has(check.id))
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Check IDs must be unique.',
+          path: ['checks', index, 'id'],
+        });
+      for (const dependency of check.dependsOn)
+        if (!seen.has(dependency) || dependency === check.id)
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Dependencies must refer to earlier checks.',
+            path: ['checks', index, 'dependsOn'],
+          });
+      seen.add(check.id);
+    });
+    if (new TextEncoder().encode(JSON.stringify(suite)).length > 262144)
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Suite configuration exceeds 256 KB.',
+      });
+  });
+export type EvaluationSuiteDraft = z.infer<typeof evaluationSuiteDraftSchema>;
+export type LegacyEvaluationPlanDraft = z.infer<
+  typeof legacyEvaluationPlanDraftSchema
+>;
+export const evaluationPlanDraftSchema = z.union([
+  legacyEvaluationPlanDraftSchema,
+  evaluationSuiteDraftSchema,
+]);
+export function isEvaluationSuite(
+  value: EvaluationPlanDraft,
+): value is EvaluationSuiteDraft {
+  return 'formatVersion' in value && value.formatVersion === 2;
+}
 export type EvaluationPlanDraft = z.infer<typeof evaluationPlanDraftSchema>;
 export const evaluationPlanSchema = z.object({
   id: z.uuid(),
@@ -57,7 +212,7 @@ export const evaluationPlanSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 export type EvaluationPlan = z.infer<typeof evaluationPlanSchema>;
-export const evaluationResultSchema = z
+export const legacyEvaluationResultSchema = z
   .object({
     schemaVersion: z.literal(1),
     metrics: z
@@ -81,14 +236,162 @@ export const evaluationResultSchema = z
     artifacts: z.array(relativePath).max(100).default([]),
   })
   .strict();
+export const suiteCheckStatusSchema = z.enum([
+  'pending',
+  'running',
+  'passed',
+  'failed',
+  'unknown',
+  'skipped',
+  'timed_out',
+  'cancelled',
+  'interrupted',
+]);
+export const suiteCheckResultSchema = z
+  .object({
+    checkId,
+    status: suiteCheckStatusSchema,
+    exitCode: z.number().int().nullable(),
+    evidenceStatus: z.enum([
+      'valid',
+      'not_produced',
+      'missing',
+      'malformed',
+      'stale',
+      'exceeds_limit',
+    ]),
+    reason: text.optional(),
+    blockedBy: uniqueIds.default([]),
+    metrics: z
+      .array(legacyEvaluationResultSchema.shape.metrics.element)
+      .max(100)
+      .default([])
+      .refine(
+        (metrics) =>
+          new Set(metrics.map((m) => m.name)).size === metrics.length,
+        'Metric names must be unique.',
+      ),
+    caseCoverage: z.enum(['complete', 'partial', 'unknown']),
+    caseCount: z.number().int().nonnegative().max(10000).nullable(),
+    artifactReferences: z.array(text).max(100).default([]),
+  })
+  .strict();
+export const evaluationSuiteResultSchema = z
+  .object({
+    schemaVersion: z.literal(2),
+    requiredValidation: z.enum(['passed', 'failed', 'unknown']),
+    checks: z.array(suiteCheckResultSchema).min(1).max(50),
+  })
+  .strict()
+  .superRefine((result, ctx) => {
+    if (
+      new Set(result.checks.map((check) => check.checkId)).size !==
+      result.checks.length
+    )
+      ctx.addIssue({ code: 'custom', message: 'Check IDs must be unique.' });
+    if (
+      result.checks.reduce((sum, check) => sum + (check.caseCount ?? 0), 0) >
+      50000
+    )
+      ctx.addIssue({ code: 'custom', message: 'Run exceeds 50,000 cases.' });
+  });
+export const evaluationResultSchema = z.union([
+  legacyEvaluationResultSchema,
+  evaluationSuiteResultSchema,
+]);
+export type LegacyEvaluationResult = z.infer<
+  typeof legacyEvaluationResultSchema
+>;
+export type SuiteCheckResult = z.infer<typeof suiteCheckResultSchema>;
+export const suiteCheckRecordSchema = z
+  .object({
+    runId: z.uuid(),
+    ordinal: z.number().int().nonnegative().max(49),
+    specification: suiteCheckSchema,
+    specificationFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    datasetIdentity: text,
+    environmentIdentity: text,
+    producerIdentity: text,
+    startedAt: z.iso.datetime().nullable(),
+    finishedAt: z.iso.datetime().nullable(),
+    durationMs: z.number().int().nonnegative().nullable(),
+    logsTruncated: z.boolean().default(false),
+    result: suiteCheckResultSchema,
+  })
+  .strict()
+  .refine(
+    (record) => record.specification.id === record.result.checkId,
+    'Check specification and result IDs must match.',
+  );
+export type SuiteCheckRecord = z.infer<typeof suiteCheckRecordSchema>;
+export const suiteCaseSchema = z
+  .object({
+    id: z.string().min(1).max(500),
+    label: text,
+    suiteId: text.optional(),
+    status: z.enum(['passed', 'failed', 'skipped', 'unknown']),
+    identityStatus: z.enum(['stable', 'ambiguous']).default('stable'),
+    rawIdentifiers: z.array(z.string().max(2000)).max(10).default([]),
+    metrics: z
+      .array(
+        legacyEvaluationResultSchema.shape.metrics.element.omit({
+          samples: true,
+        }),
+      )
+      .max(100)
+      .default([])
+      .refine(
+        (metrics) =>
+          new Set(metrics.map((m) => m.name)).size === metrics.length,
+        'Metric names must be unique.',
+      ),
+    reason: text.optional(),
+  })
+  .strict();
+export type SuiteCase = z.infer<typeof suiteCaseSchema>;
+export const suiteCasesReportSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    datasetIdentity: text,
+    cases: z
+      .array(suiteCaseSchema)
+      .max(10000)
+      .refine(
+        (cases) => new Set(cases.map((item) => item.id)).size === cases.length,
+        'Case IDs must be unique.',
+      ),
+  })
+  .strict();
+export const suiteCasePageRequestSchema = z
+  .object({
+    cursor: z.string().max(2048).optional(),
+    limit: z.number().int().min(1).max(100).default(100),
+    status: suiteCaseSchema.shape.status.optional(),
+  })
+  .strict();
+export type SuiteCasePageRequest = z.infer<typeof suiteCasePageRequestSchema>;
+export const suiteCasePageSchema = z.object({
+  runId: z.uuid(),
+  checkId,
+  cases: z.array(suiteCaseSchema).max(100),
+  total: z.number().int().nonnegative().max(10000),
+  nextCursor: z.string().nullable(),
+});
+export const suiteCheckListSchema = z.object({
+  checks: z.array(suiteCheckRecordSchema).max(50),
+});
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
-export const implementationEvidenceSchema = z.object({
-  summary: z.string().trim().min(1).max(10000),
-  changedFiles: z.array(text).max(100).default([]),
-  checks: z.array(text).max(50).default([]),
-  limitations: z.array(text).max(50).default([]),
-}).strict();
-export type ImplementationEvidence = z.infer<typeof implementationEvidenceSchema>;
+export const implementationEvidenceSchema = z
+  .object({
+    summary: z.string().trim().min(1).max(10000),
+    changedFiles: z.array(text).max(100).default([]),
+    checks: z.array(text).max(50).default([]),
+    limitations: z.array(text).max(50).default([]),
+  })
+  .strict();
+export type ImplementationEvidence = z.infer<
+  typeof implementationEvidenceSchema
+>;
 
 export const experimentRequestSchema = z
   .object({

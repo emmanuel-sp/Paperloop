@@ -12,7 +12,7 @@ import { appState, researchRecommendations } from '../storage/schema.js';
 import type { ProjectService } from '../projects/project-service.js';
 import type { ResearchService } from '../research/research-service.js';
 import { PlanService, fingerprint, WorkflowError } from './plan-service.js';
-function readMetadata(root: string, name: string): string | null {
+function readMetadata(root: string, name: string, limit = 32768): string | null {
   let fd: number | undefined;
   try {
     fd = openSync(
@@ -20,10 +20,10 @@ function readMetadata(root: string, name: string): string | null {
       constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
     );
     const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.size > 32768) return null;
-    const bytes = Buffer.alloc(32769);
+    if (!stat.isFile() || stat.size > limit) return null;
+    const bytes = Buffer.alloc(limit + 1);
     const count = readSync(fd, bytes, 0, bytes.length, 0);
-    return count <= 32768 ? bytes.subarray(0, count).toString('utf8') : null;
+    return count <= limit ? bytes.subarray(0, count).toString('utf8') : null;
   } catch {
     return null;
   } finally {
@@ -98,7 +98,7 @@ export class EvaluationSuggestionService {
     const root =
       project.repository?.kind === 'local' ? project.repository.path : null;
     if (root) {
-      const manifest = readMetadata(root, 'paperloop.evaluation.json');
+      const manifest = readMetadata(root, 'paperloop.evaluation.json', 262144);
       if (manifest) {
         try {
           draft = evaluationPlanDraftSchema.parse(JSON.parse(manifest));

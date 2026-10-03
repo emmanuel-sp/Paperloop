@@ -62,6 +62,8 @@ describe('project MCP endpoint', () => {
       'experiments_reconcile',
       'evaluations_run',
       'evaluations_run_get',
+      'evaluations_run_checks',
+      'evaluations_run_cases',
       'evaluations_cancel',
       'evaluations_external_result',
       'experiments_compare',

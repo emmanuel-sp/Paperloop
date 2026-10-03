@@ -107,6 +107,7 @@ milestone acceptance. The existing build emits font-resolution and bundle-size
 warnings; they are outside this fixture change and remain for cross-section review.
 
 The next #66 phase is recorded in [the layered Evaluation design](EVALUATION_SUITES.md),
-with conventional/ML examples and agent-led populated sketches. After that design
-record, implement versioned contracts/storage in a dedicated bounded phase.
+with conventional/ML examples and agent-led populated sketches. Versioned
+contracts/storage are now implemented; next add the serial suite
+runner and bounded report adapters in a dedicated approval/process review phase.
 Keep #46 open for its remaining scenario and final live/visual/workflow coverage.

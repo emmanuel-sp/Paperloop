@@ -1,3 +1,4 @@
+import { isEvaluationSuite } from '@paperloop/contracts';
 import { AutoTextarea } from '../components/AutoTextarea';
 import { useState, type FormEvent } from 'react';
 import { Dialog } from '../components/Dialog';
@@ -131,8 +132,8 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
         <p>Define the criteria before your coding agent implements; evaluate the candidate after it reports readiness.</p>
         <details><summary>Why this Evaluation?</summary><ul>{suggestion.data.rationale.map(reason => <li key={reason}>{reason}</li>)}</ul><p>Research angle: {suggestion.data.researchAngle}</p></details>
         {suggestion.data.limitations.map(item => <p className="muted" key={item}>{item}</p>)}
-        {suggestion.data.draft ? <><p>Metrics: {suggestion.data.draft.metrics.map(metric => `${metric.name} (${metric.unit})`).join(', ')}</p><button className="button" disabled={useSuggestion.isPending} onClick={() => useSuggestion.mutate()}>Use suggested Evaluation</button></> : null}
-        {suggestion.data.plan?.approvedAt && documentId ? <button className="button primary" disabled={useSuggestion.isPending} onClick={() => useSuggestion.mutate(undefined, { onSuccess: () => setParams(previous => { const next = new URLSearchParams(previous); next.set('view', 'prepare'); next.set('plan', suggestion.data!.plan!.id); return next; }) })}>Continue to implementation</button> : null}
+        {suggestion.data.draft ? <><p>Metrics: {isEvaluationSuite(suggestion.data.draft) ? `${suggestion.data.draft.checks.length} checks; suite execution is not available yet` : suggestion.data.draft.metrics.map(metric => `${metric.name} (${metric.unit})`).join(', ')}</p><button className="button" disabled={useSuggestion.isPending} onClick={() => useSuggestion.mutate()}>Use suggested Evaluation</button></> : null}
+        {suggestion.data.plan?.approvedAt && !isEvaluationSuite(suggestion.data.plan.configuration) && documentId ? <button className="button primary" disabled={useSuggestion.isPending} onClick={() => useSuggestion.mutate(undefined, { onSuccess: () => setParams(previous => { const next = new URLSearchParams(previous); next.set('view', 'prepare'); next.set('plan', suggestion.data!.plan!.id); return next; }) })}>Continue to implementation</button> : null}
       </section> : null}
       {useSuggestion.error ? <p role="alert">{useSuggestion.error.message}</p> : null}
       <div className="form-actions">
@@ -446,6 +447,11 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
               {plan.approvedAt ? 'Approved' : 'Approval required'}
             </p>
             <h2>{plan.configuration.name}</h2>
+            {isEvaluationSuite(plan.configuration) ? <>
+              <p>{plan.configuration.checks.length} checks · overall limit {plan.configuration.overallTimeoutMs / 1000}s</p>
+              <p className="workflow-notice">Layered Evaluation execution is not available yet. You can inspect this saved suite.</p>
+              <ul>{plan.configuration.checks.map(check => <li key={check.id}>{check.name} · {check.required ? 'required' : 'optional'} · {check.report.adapter}</li>)}</ul>
+            </> : <>
             <p>Measures {plan.configuration.metrics.map(metric => `${metric.name} in ${metric.unit}${metric.guardrail ? ' (guardrail)' : ''}`).join('; ')}.</p>
             <dl className="provenance-list">
               <div>
@@ -499,6 +505,7 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
                 ))}
               </ul>
             </details>
+            </>}
             <p className="workflow-notice">
               Evaluations run with your local permissions. Review the command
               and inputs before approving this version.
@@ -510,7 +517,7 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
               </pre>
               <code>{plan.fingerprint}</code>
             </details>
-            {!plan.approvedAt ? (
+            {!plan.approvedAt && !isEvaluationSuite(plan.configuration) ? (
               <button
                 className="button primary"
                 disabled={mutation.isPending}
