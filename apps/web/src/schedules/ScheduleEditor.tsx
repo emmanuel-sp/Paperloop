@@ -1,16 +1,19 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 import {
   scheduleConfigSchema,
   type ScheduleConfig,
 } from '@paperloop/contracts';
 export function ScheduleEditor({
   initial,
+  projectId,
   editing,
   pending,
   onSave,
   onCancel,
 }: {
   initial?: ScheduleConfig;
+  projectId: string;
   editing: boolean;
   pending: boolean;
   onSave: (config: ScheduleConfig) => void;
@@ -33,6 +36,7 @@ export function ScheduleEditor({
       <label>
         Cadence
         <select
+          disabled={pending}
           name="cadence"
           autoComplete="off"
           value={config.cadence}
@@ -48,18 +52,9 @@ export function ScheduleEditor({
         </select>
       </label>
       <label>
-        Timezone
-        <input
-          name="timezone"
-          autoComplete="off"
-          required
-          value={config.timezone}
-          onChange={(e) => setConfig({ ...config, timezone: e.target.value })}
-        />
-      </label>
-      <label>
         Local time
         <input
+          disabled={pending}
           name="local-time"
           autoComplete="off"
           type="time"
@@ -75,6 +70,7 @@ export function ScheduleEditor({
         <label>
           Weekday
           <select
+            disabled={pending}
             name="weekday"
             autoComplete="off"
             value={config.weekday}
@@ -101,6 +97,7 @@ export function ScheduleEditor({
       <label>
         Research query
         <input
+          disabled={pending}
           name="research-query"
           autoComplete="off"
           value={config.query}
@@ -108,66 +105,100 @@ export function ScheduleEditor({
           onChange={(e) => setConfig({ ...config, query: e.target.value })}
         />
       </label>
-      <label>
-        Executor
-        <select
-          name="executor"
-          autoComplete="off"
-          value={config.driver}
-          onChange={(e) =>
-            setConfig({
-              ...config,
-              driver: e.target.value as ScheduleConfig['driver'],
-            })
-          }
-        >
-          <option value="native">Native coding agent</option>
-          <option value="api">Local paid API analysis</option>
-        </select>
-      </label>
-      {config.driver === 'native' ? (
+      <p className="workflow-notice">
+        {editing ? 'Saved schedule settings' : 'Defaults from Settings'}:{' '}
+        {config.timezone} ·{' '}
+        {config.driver === 'native'
+          ? config.mechanism
+          : `${config.provider} paid API`}
+        . Native setup remains pending until your agent reports it. API work
+        requires separate activation.
+      </p>
+      <Link to={`/projects/${projectId}/settings?tab=preferences`}>
+        Review shared preferences
+      </Link>
+      <details>
+        <summary>Override timezone or execution defaults</summary>
         <label>
-          Native mechanism
-          <select
-            name="native-mechanism"
+          Timezone
+          <input
+            disabled={pending}
+            name="timezone"
             autoComplete="off"
-            value={config.mechanism}
+            required
+            value={config.timezone}
+            onChange={(e) => setConfig({ ...config, timezone: e.target.value })}
+          />
+        </label>
+        <label>
+          Executor
+          <select
+            disabled={pending}
+            name="executor"
+            autoComplete="off"
+            value={config.driver}
             onChange={(e) =>
               setConfig({
                 ...config,
-                mechanism: e.target.value as ScheduleConfig['mechanism'],
+                driver: e.target.value as ScheduleConfig['driver'],
               })
             }
           >
-            <option value="codex-desktop">Codex desktop</option>
-            <option value="claude-desktop">Claude Code desktop</option>
-            <option value="claude-session">Claude Code session /loop</option>
+            <option value="native">Native coding agent</option>
+            <option value="api">Local paid API analysis</option>
           </select>
         </label>
-      ) : (
-        <label>
-          API provider
-          <select
-            name="api-provider"
-            autoComplete="off"
-            value={config.provider}
-            onChange={(e) =>
-              setConfig({
-                ...config,
-                provider: e.target.value as ScheduleConfig['provider'],
-              })
-            }
-          >
-            <option value="openai">OpenAI</option>
-            <option value="anthropic">Anthropic</option>
-          </select>
-        </label>
-      )}
+        {config.driver === 'native' ? (
+          <label>
+            Native mechanism
+            <select
+              disabled={pending}
+              name="native-mechanism"
+              autoComplete="off"
+              value={config.mechanism}
+              onChange={(e) =>
+                setConfig({
+                  ...config,
+                  mechanism: e.target.value as ScheduleConfig['mechanism'],
+                })
+              }
+            >
+              <option value="codex-desktop">Codex desktop</option>
+              <option value="claude-desktop">Claude Code desktop</option>
+              <option value="claude-session">Claude Code session /loop</option>
+            </select>
+          </label>
+        ) : (
+          <label>
+            API provider
+            <select
+              disabled={pending}
+              name="api-provider"
+              autoComplete="off"
+              value={config.provider}
+              onChange={(e) =>
+                setConfig({
+                  ...config,
+                  provider: e.target.value as ScheduleConfig['provider'],
+                })
+              }
+            >
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </label>
+        )}
+      </details>
       <button className="button primary" disabled={pending}>
         Save schedule
       </button>
       {editing ? (
-        <button type="button" className="button" onClick={onCancel}>
+        <button
+          type="button"
+          className="button"
+          disabled={pending}
+          onClick={onCancel}
+        >
           Cancel edit
         </button>
       ) : null}

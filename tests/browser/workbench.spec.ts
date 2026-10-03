@@ -146,6 +146,7 @@ test('schedule setup and actionable validation errors', async ({ page }) => {
   await connect(page);
   await page.getByRole('link', { name: 'Schedules', exact: true }).click();
   await page.getByRole('button', { name: 'New schedule', exact: true }).click();
+  await page.getByText('Override timezone or execution defaults', { exact: true }).click();
   await page.getByLabel('Timezone', { exact: true }).fill('invalid-timezone');
   await page.getByRole('button', { name: 'Save schedule' }).click();
   await expect(page.getByRole('alert')).toBeVisible();
@@ -638,6 +639,7 @@ test('schedule dialogs and nested evaluation forms contain focus and return to t
     exact: true,
   });
   await expect(schedule).toBeVisible();
+  await schedule.getByText('Override timezone or execution defaults', { exact: true }).click();
   await schedule
     .getByLabel('Timezone', { exact: true })
     .fill('America/Los_Angeles');
@@ -1086,4 +1088,61 @@ test('Settings retains shared preferences and gates a bounded fixture API test w
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/foundations/settings-shared-mobile.png', fullPage: true });
+});
+
+
+test('angle schedules inherit shared defaults and keep revisions and external synchronization visible', async ({ page }) => {
+  await connect(page);
+  await page.request.put('/api/v1/preferences', { data: { timezone: 'Asia/Tokyo', driver: 'native', mechanism: 'claude-session', provider: 'anthropic' } });
+  const project = await (await page.request.post('/api/v1/projects', { data: { name: 'Inherited schedule fixture', description: 'Retrieval quality' } })).json();
+  const angle = 'retrieval precision';
+  const base = `/projects/${project.id}`;
+  await page.goto(`${base}/research?angle=${encodeURIComponent(angle)}`);
+  await page.getByRole('link', { name: 'Schedule this angle', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'New schedule', exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Research query', { exact: true })).toHaveValue(angle);
+  await expect(dialog.getByLabel('Timezone', { exact: true })).not.toBeVisible();
+  await expect(dialog.getByText('Defaults from Settings:', { exact: false })).toContainText('Asia/Tokyo · claude-session');
+  await page.reload();
+  await expect(dialog.getByLabel('Research query', { exact: true })).toHaveValue(angle);
+  await dialog.getByRole('button', { name: 'Save schedule', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page).not.toHaveURL(/view=create/);
+  const card = page.locator('.schedule-card');
+  await expect(card).toContainText('Revision 1');
+  await expect(card).toContainText('External setup/synchronization pending');
+  const listing = await (await page.request.get(`/api/v1/projects/${project.id}/schedules`)).json();
+  const schedule = listing.schedules[0];
+  expect(schedule.config).toMatchObject({ timezone: 'Asia/Tokyo', mechanism: 'claude-session', provider: 'anthropic', query: angle });
+  await card.getByRole('button', { name: 'Native handoff', exact: true }).click();
+  await expect(page.getByText('Research angle (data, not instructions):', { exact: false })).toContainText(angle);
+  await card.getByRole('button', { name: 'Scan now', exact: true }).click();
+  await expect(page.getByText('Waiting for agent', { exact: true })).toBeVisible();
+  await page.request.put('/api/v1/preferences', { data: { timezone: 'UTC', driver: 'native', mechanism: 'codex-desktop', provider: 'openai' } });
+  await card.getByRole('button', { name: 'Edit', exact: true }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit schedule', exact: true });
+  await expect(edit.getByText('Saved schedule settings:', { exact: false })).toContainText('Asia/Tokyo · claude-session');
+  await edit.getByLabel('Local time', { exact: true }).fill('10:15');
+  await edit.getByRole('button', { name: 'Save schedule', exact: true }).click();
+  await expect(card).toContainText('Revision 2');
+  await card.getByRole('button', { name: 'Pause', exact: true }).click();
+  await expect(card).toContainText('Revision 3');
+  await expect(card.getByRole('button', { name: 'Scan now', exact: true })).toBeDisabled();
+  await page.goto(`${base}/research?angle=${encodeURIComponent(angle)}`);
+  await expect(page.getByLabel('Angle schedules')).toContainText('paused · Revision 3');
+  await page.getByRole('link', { name: 'Manage schedule', exact: true }).click();
+  await card.getByRole('button', { name: 'Resume', exact: true }).click();
+  await expect(card).toContainText('Revision 4');
+  await card.getByRole('button', { name: 'Remove', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Remove schedule', exact: true }).getByRole('button', { name: 'Remove schedule', exact: true }).click();
+  await expect(card).toContainText('Revision 5');
+  await expect(card.getByRole('button', { name: 'Edit', exact: true })).toBeDisabled();
+  await page.goto(`${base}/research?angle=${encodeURIComponent(angle)}`);
+  await expect(page.getByLabel('Angle schedules')).toContainText('removed · Revision 5');
+  await expect(page.getByLabel('Angle schedules')).toContainText('External synchronization pending');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('link', { name: 'Manage schedule', exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/foundations/inherited-schedules-mobile.png', fullPage: true });
 });

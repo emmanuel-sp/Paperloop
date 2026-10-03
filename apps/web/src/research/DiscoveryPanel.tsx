@@ -1,4 +1,4 @@
-import type { ResearchDocument } from '@paperloop/contracts';
+import { scheduleListSchema, type ResearchDocument } from '@paperloop/contracts';
 import { Field } from '../components/Field';
 import { AutoTextarea } from '../components/AutoTextarea';
 import { Dialog } from '../components/Dialog';
@@ -7,7 +7,7 @@ import { WorkflowStatus } from '../components/WorkflowStatus';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
-import { getProject } from '../api/client';
+import { getProject, request } from '../api/client';
 import {
   projectSources,
   listScans,
@@ -33,6 +33,12 @@ export function DiscoveryPanel({ projectId, documents, onSelect }: {
     ''
   ).slice(0, 500);
   const query = (params.get('angle') ?? inferredAngle).slice(0, 500);
+  const monitoring = useQuery({
+    queryKey: ['projects', projectId, 'schedules'],
+    queryFn: async () => scheduleListSchema.parse(await request(`/api/v1/projects/${projectId}/schedules`)),
+    refetchInterval: 15000,
+  });
+  const angleSchedules = monitoring.data?.schedules.filter(item => item.config.query.trim() === query.trim() && !!query.trim()) ?? [];
   const sourceParams = new URLSearchParams(params);
   sourceParams.set('view', 'sources');
   const sourcesHref = `/projects/${projectId}/research?${sourceParams}`;
@@ -146,8 +152,17 @@ export function DiscoveryPanel({ projectId, documents, onSelect }: {
         ) : null}
         {sources.data?.selectionOrigin === 'suggested' ? <p className="composer-help">Sources suggested from project context. Adjust them in Sources.</p> : null}
         <p className="composer-help">
-          Track collects papers once. Ongoing monitoring is not configured by this action.
+          Track collects papers once. Ongoing monitoring is not configured by this action.{' '}
+          {query.trim() ? <Link to={`/projects/${projectId}/schedules?view=create&angle=${encodeURIComponent(query)}`}>Schedule this angle</Link> : null}
         </p>
+        {angleSchedules.length ? <div className="workflow-notice" aria-label="Angle schedules">
+          {angleSchedules.map(schedule => <p key={schedule.id}>
+            Monitoring intent: {schedule.state} · Revision {schedule.revision} · {schedule.config.timezone}.{' '}
+            {schedule.config.driver === 'native' ? schedule.setup === 'pending' ? 'External synchronization pending.' : schedule.setup === 'failed' ? 'External setup failed.' : 'Agent-reported configuration.' : 'Local API dispatcher; paid activation required.'}{' '}
+            Last observed check-in: {schedule.lastCheckIn ? new Date(schedule.lastCheckIn).toLocaleString() : 'None'}.{' '}
+            <Link to={`/projects/${projectId}/schedules`}>Manage schedule</Link>
+          </p>)}
+        </div> : null}
         {project.isPending ? <p role="status">Loading the project’s research angle…</p> : null}
         {project.isError ? (
           <p role="alert">
