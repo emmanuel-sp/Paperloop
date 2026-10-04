@@ -2,7 +2,7 @@
 
 This is the operating plan for completing milestone 6, then using Paperloop to improve Paperloop. It records the owner's October 1, 2026 instructions so new task threads can resume without depending on a long chat.
 
-Current execution mode: the owner manually starts remote development tasks from mobile. No automatic development schedule has been registered. The scheduling guidance below is retained for a future switch; it does not restrict manually requested work to particular weekdays. Respect the personal quota reserve when telemetry is available and clearly disclose when it cannot be enforced.
+Current execution mode: the owner manually starts remote development tasks from mobile. No automatic development schedule has been registered. The scheduling guidance below is retained for a future switch; it does not restrict manually requested work to particular weekdays.
 
 ## Authorization and boundaries
 
@@ -22,21 +22,11 @@ The cloud checkout is prepared, but an environment is not a scheduler. This plan
 
 References: [Codex scheduling documentation](https://developers.openai.com/codex/app/automations/) and [Paperloop handoffs](SCHEDULING.md).
 
-## Usage budget
+## Scheduling and retry bounds
 
-The owner reported **24% remaining** in both the five-hour and weekly allowances and requested **10% of total allowance reserved for personal use**. The five-hour reset was reported as 3:42 AM and the weekly reset as October 4, 2026. Interpret the reported clock time as America/Los_Angeles unless corrected; the weekly reset hour is unknown. These are historical observations, not current telemetry.
+The owner manually starts development runs. No account-usage reserve, telemetry preflight or reset-date scheduling gate applies. Do not repeat historical account-usage observations in task results or use them to delay authorized work.
 
-There were 14 percentage points available above the reserve in each allowance at that observation. Do not treat percentage points as a known number of tasks or tokens. Time-based schedules cannot guarantee a quota reserve, and switching reasoning/model does not remove account limits.
-
-Before each substantial run, use supported current quota telemetry if the runner exposes it. Pause if either allowance is at or below 10%; admit work only with additional headroom for the anticipated run. Checkpoint before the reserve is crossed when telemetry is available. A preflight check alone cannot guarantee that a long turn stays above the reserve. If telemetry is unavailable, report that the reserve cannot be enforced automatically. Do not promise a hard 10% reserve from guessed task counts.
-
-The installed Codex CLI reports ChatGPT authentication, but this instance's read-only account/rate-limit query could not initialize its local state runtime, including a retry with writable state/log directory overrides. No working automated quota reader was verified. Do not reuse those failed queries as a verified gate.
-
-Initial cadence with verified quota telemetry: one bounded run on Monday, Wednesday, and Friday at 9:00 AM and 3:00 PM America/Los_Angeles (six starts per week, six hours apart). This is a starting frequency, not an estimate of weekly consumption. Allow at most one substantial work unit per run.
-
-Without telemetry, use a more conservative fallback: Monday and Thursday at 9:00 AM America/Los_Angeles, one bounded phase per run, beginning only after the reported October 4 weekly reset has actually occurred. The first intended date is Monday, October 5, 2026. This targets the owner's approximate reserve but cannot guarantee it. State that limitation in run results; do not misreport quota percentages. Do not start a large implementation before the weekly reset based on the historical 14-point headroom. Review measured consumption before increasing frequency. Start with a remote preflight/review task rather than assuming a schedule has coding access.
-
-Do not start continuous polling, parallel schedules per issue, unlimited retries, or catch-up bursts. Use supported completion/CI events where available instead of checking repeatedly. Persist a checkpoint on a rate-limit error and resume only after the actual reset and reconciliation. Keep failure retries bounded; do not retry paid calls automatically. Raise cadence only after measuring real consumption and preserving the personal reserve.
+A future recurring schedule must be configured and verified separately with the owner. This document does not register one. Keep one substantial work unit per run and one worker at a time. Do not start continuous polling, parallel schedules per issue, unlimited retries or catch-up bursts. Prefer supported completion/CI events and bounded status checks. If a real rate-limit error prevents work, persist a checkpoint with the actual error and resume when access is available. Do not retry paid calls automatically.
 
 ## Work queue and thread boundaries
 
@@ -74,16 +64,16 @@ If implementing a note requires functionality outside existing issues, draft a c
 
 ## Single-worker procedure
 
-1. Check the actual time, current quota if available, repository access, checkout status, and pending work. Respect the reserve and pause conditions. Cloud tasks are already isolated: use their existing checkouts, without creating worktrees unless requested. Preserve existing user changes.
+1. Check the actual time, repository access, checkout status, and pending work. Cloud tasks are already isolated: use their existing checkouts, without creating worktrees unless requested. Preserve existing user changes.
 2. Read open PRs and the selected issue/dependencies. Resume the existing PR/checkpoint before starting new work. Verify any stale claim or interrupted changes; never steal an active task or force-push another contributor's branch.
 3. Take one bounded work unit. Record its acceptance criteria, branch/PR, and progress in durable repository/GitHub state. Independent task threads must not rely on process memory or local-only notes surviving.
 4. Implement and run checks appropriate to changed behavior. Existing CI runs build, types, lint, service/contract tests, browser workflows, and release smoke checks. For UI changes inspect actual populated desktop and narrow-screen screenshots; passing browser assertions alone is not visual review. Keep measured results distinct from synthetic fixtures and research claims.
 5. Open or update one PR with concrete behavior and validation. Attach the PR to the task where supported. Review the exact current diff and wait for required CI outcomes. Fix diagnosed failures; checkpoint CI that is still pending instead of polling indefinitely.
 6. The owner permits merging. Merge only a reviewed, conflict-free current head with required checks passing. Use supported conditional merge mechanisms to avoid racing a changed head. Do not use administrator bypass to skip failed checks. Approval-sensitive changes need a dedicated review phase; do not create fake approvals under the author's identity.
 7. Close completed issues, update the roadmap/project status when permissions allow, and record the next dependency-ready unit. If incomplete, retain the issue and PR and write a checkpoint with exact failing/unrun checks and the next command. Do not close work based on partial criteria.
-8. Notify the owner for a blocking product decision, required credential, unavailable executor, quota limitation, or proposed scope expansion. Otherwise leave a short result. Use supported task notifications; do not introduce unrelated email/Slack messaging.
+8. Notify the owner for a blocking product decision, required credential, unavailable executor, actual service limit preventing work, or proposed scope expansion. Otherwise leave a short result. Use supported task notifications; do not introduce unrelated email/Slack messaging.
 
-A checkpoint should identify: issue(s), exact branch/head/PR, changed behavior, passed/failed/unrun checks, screenshots and measured evidence, next action, blocker, and last observed budget/reset if available. Do not store secrets or connection credentials.
+A checkpoint should identify: issue(s), exact branch/head/PR, changed behavior, passed/failed/unrun checks, screenshots and measured evidence, next action, blocker. Do not store secrets or connection credentials.
 
 ## Cloud startup and verification
 
@@ -102,9 +92,9 @@ Validation from the checkout: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm
 
 ## Durable scheduled-task prompt
 
-Use this prompt with the remote/new-task option and this cloud environment. Set the actual model to GPT-6.1 Sol, reasoning medium, in the runner. Initially schedule Monday/Thursday at 9:00 AM America/Los_Angeles after the October 4 weekly reset; use the higher cadence only after telemetry and consumption support it. The first run must validate executor access. No task has been registered by writing this document.
+Use this prompt with the remote/new-task option and this cloud environment. Set the actual model to GPT-6.1 Sol, reasoning medium, in the runner. Configure a recurring schedule only when the owner requests one. The first run must validate executor access. No task has been registered by writing this document.
 
-> Develop emmanuel-sp/Paperloop using docs/DEVELOPMENT_AUTOMATION.md from the latest repository as the operating policy. Work in the provided cloud checkout. Read current issues, PRs, and the latest checkpoint. On the first run, verify cloud GitHub/checkout/build/browser capabilities before implementation. Check actual usage limits through supported telemetry and target 10% reserved in both five-hour and weekly allowance. If telemetry is unavailable, use the document's conservative Monday/Thursday fallback after the October 4 reset, keep the phase small, and explicitly report that the reserve is not automatically enforced. Never invent quota readings. If the cloud executor is unavailable, a reported limit is reached, or a competing task owns the work, report the blocker and stop without starting implementation. Resume pending work first; otherwise select one dependency-ready unit from milestone 6. Use one worker and one active implementation PR. Keep authentication, evaluation approval, and paid activation changes in dedicated review phases. Implement, test, and visually inspect affected populated desktop/mobile flows. Create/update a PR and merge a reviewed current head only when required checks pass; checkpoint pending CI without repeated polling. Update completed issues and status. If milestone 6 is done, fix confirmed defects and bounded usability problems within approved scope, and propose the next milestone for owner approval. Never start new functional scope or paid execution without approval. Leave a durable checkpoint and a short result, requesting input only for a concrete blocker or scope decision.
+> Develop emmanuel-sp/Paperloop using docs/DEVELOPMENT_AUTOMATION.md from the latest repository as the operating policy. Work in the provided cloud checkout. Read current issues, PRs, and the latest checkpoint. On the first run, verify cloud GitHub/checkout/build/browser capabilities before implementation. If the cloud executor is unavailable, an actual service limit prevents work, or a competing task owns the work, report the blocker and stop without starting implementation. Resume pending work first; otherwise select one dependency-ready unit from milestone 6. Use one worker and one active implementation PR. Keep authentication, evaluation approval, and paid activation changes in dedicated review phases. Implement, test, and visually inspect affected populated desktop/mobile flows. Create/update a PR and merge a reviewed current head only when required checks pass; checkpoint pending CI without repeated polling. Update completed issues and status. If milestone 6 is done, fix confirmed defects and bounded usability problems within approved scope, and propose the next milestone for owner approval. Never start new functional scope or paid execution without approval. Leave a durable checkpoint and a short result, requesting input only for a concrete blocker or scope decision.
 
 ## Paperloop developing Paperloop
 

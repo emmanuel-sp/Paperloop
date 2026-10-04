@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 
-test('saved layered suites remain inspectable across viewports with execution unavailable', async ({ page }) => {
+test('saved layered suites remain inspectable across viewports with assisted setup unavailable', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
@@ -20,12 +20,12 @@ test('saved layered suites remain inspectable across viewports with execution un
     const dialog = page.getByRole('dialog', { name: 'Evaluation', exact: true });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole('heading', { name: suite.name })).toBeVisible();
-    await expect(dialog.getByText('Layered Evaluation execution is not available yet. You can inspect this saved suite.', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Layered Evaluation setup is not available in this screen yet. You can inspect this saved suite.', { exact: true })).toBeVisible();
     await expect(dialog.getByRole('button', { name: /Approve version/ })).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: 'Continue to implementation' })).toHaveCount(0);
     await expect(dialog.getByRole('alert')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await dialog.getByText('Layered Evaluation execution is not available yet. You can inspect this saved suite.', { exact: true }).evaluate(element => element.scrollIntoView({ block: 'center' }));
+    await dialog.getByText('Layered Evaluation setup is not available in this screen yet. You can inspect this saved suite.', { exact: true }).evaluate(element => element.scrollIntoView({ block: 'center' }));
     await page.screenshot({ path: `test-results/evaluation-suites/review-${width}x${height}.png` });
     await dialog.getByText('Exact configuration and fingerprint', { exact: true }).click();
     const exact = dialog.locator('pre');

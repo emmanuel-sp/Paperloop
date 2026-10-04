@@ -637,6 +637,52 @@ describe('serial suite execution', () => {
       'skipped',
     ]);
   });
+  it('interrupts instead of hanging or passing when an escaped descendant retains output pipes', async () => {
+    const script = `const {spawn}=require('child_process');const child=spawn(${JSON.stringify(process.execPath)},['-e','setInterval(()=>{},1000)'],{detached:true,stdio:['ignore',process.stdout,process.stderr]});require('fs').writeFileSync('escaped.pid',String(child.pid));child.unref();`;
+    const f = fixture([{ id: 'escape', script }, { id: 'later' }]);
+    let pid: number | undefined;
+    try {
+      const result = await executeSuite(f.options).done;
+      pid = Number(readFileSync(join(f.workspace, 'escaped.pid'), 'utf8'));
+      expect(result.status).toBe('interrupted');
+      expect(result.error).toMatch(/termination/);
+      expect(result.result.checks.map((check) => check.status)).toEqual([
+        'interrupted',
+        'skipped',
+      ]);
+    } finally {
+      pid ??= Number(readFileSync(join(f.workspace, 'escaped.pid'), 'utf8'));
+      try {
+        process.kill(-pid, 'SIGKILL');
+      } catch {
+        /* Already stopped. */
+      }
+      expect(await groups.confirmProcessGroupStopped(pid)).toBe(true);
+    }
+  });
+  it('treats excessive registered artifacts as unknown evidence without an infrastructure interruption', async () => {
+    const script =
+      "require('fs').writeFileSync('metrics.json',JSON.stringify({schemaVersion:1,metrics:[{name:'score',unit:'n',value:2}],artifacts:Array.from({length:100},(_,i)=>'file-'+i)}));";
+    const f = fixture([
+      {
+        id: 'metrics',
+        script,
+        report: {
+          adapter: 'metrics-v1',
+          adapterVersion: 1,
+          path: 'metrics.json',
+        },
+      },
+    ]);
+    const result = await executeSuite(f.options).done;
+    expect(result).toMatchObject({
+      status: 'completed',
+      result: {
+        requiredValidation: 'unknown',
+        checks: [{ status: 'unknown', evidenceStatus: 'exceeds_limit' }],
+      },
+    });
+  });
   it('bounds logs in bytes and explicitly records truncation', async () => {
     const f = fixture([
       { id: 'verbose', script: "process.stdout.write('🙂'.repeat(400000));" },

@@ -120,7 +120,7 @@ export class PlanService {
     if (isEvaluationSuite(plan.configuration))
       throw new WorkflowError(
         'SUITE_EXECUTION_UNAVAILABLE',
-        'Layered Evaluation execution is not available yet. Keep this suite for review; use an approved single-command Evaluation to run an experiment.',
+        'Layered Evaluation imports, comparisons and automation are not available yet. Use an approved single-command Evaluation for those operations.',
       );
     return { ...plan, configuration: plan.configuration };
   }

@@ -8,6 +8,8 @@ import {
   suiteCasesReportSchema,
   suiteCasePageRequestSchema,
   freezeEvaluationConfiguration,
+  workspaceObservationSchema,
+  suiteExecutionProvenanceSchema,
 } from './evaluations.js';
 import { analysisOutputSchema, submitScheduleJobSchema } from './schedules.js';
 const example = () =>
@@ -166,5 +168,72 @@ describe('layered Evaluation contracts', () => {
     expect(suiteCasePageRequestSchema.safeParse({ limit: 101 }).success).toBe(
       false,
     );
+  });
+});
+
+describe('suite observed provenance boundaries', () => {
+  const observed = {
+    status: 'observed',
+    identity: 'a'.repeat(64),
+    revision: null,
+    scope: 'workspace-without-git-dependencies-and-approved-reports-v1',
+    exclusionFingerprint: 'b'.repeat(64),
+    files: 0,
+    bytes: 0,
+    lockfiles: [],
+  };
+  it('rejects a claimed complete identity without an observation and unexplained unavailable evidence', () => {
+    expect(
+      workspaceObservationSchema.safeParse({ ...observed, identity: null })
+        .success,
+    ).toBe(false);
+    expect(
+      workspaceObservationSchema.safeParse({
+        ...observed,
+        status: 'unavailable',
+        identity: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      workspaceObservationSchema.safeParse({
+        ...observed,
+        status: 'unavailable',
+        identity: null,
+        reason: 'Bound exceeded.',
+      }).success,
+    ).toBe(true);
+  });
+  it('requires a retained automation ceiling and keeps environment/dataset identities declared', () => {
+    const base = {
+      before: observed,
+      after: null,
+      datasetVerification: 'declared',
+      environmentVerification: 'declared',
+      observerRuntime: {
+        node: 'fixture',
+        platform: 'fixture',
+        architecture: 'fixture',
+      },
+      authorization: { mode: 'automation', attemptNumber: 2, maxRuns: 2 },
+    };
+    expect(suiteExecutionProvenanceSchema.safeParse(base).success).toBe(true);
+    expect(
+      suiteExecutionProvenanceSchema.safeParse({
+        ...base,
+        authorization: { ...base.authorization, maxRuns: 1 },
+      }).success,
+    ).toBe(false);
+    expect(
+      suiteExecutionProvenanceSchema.safeParse({
+        ...base,
+        authorization: { ...base.authorization, maxRuns: null },
+      }).success,
+    ).toBe(false);
+    expect(
+      suiteExecutionProvenanceSchema.safeParse({
+        ...base,
+        environmentVerification: 'verified',
+      }).success,
+    ).toBe(false);
   });
 });
