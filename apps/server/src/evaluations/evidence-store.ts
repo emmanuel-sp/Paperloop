@@ -237,6 +237,18 @@ export class EvaluationEvidenceStore {
           'INVALID_CHECK_TIMING',
           'Terminal check evidence requires a finish time.',
         );
+      if (
+        previous.workspaceObservations &&
+        (fingerprint(previous.workspaceObservations.before) !==
+          fingerprint(parsed.workspaceObservations?.before) ||
+          (previous.workspaceObservations.after !== null &&
+            fingerprint(previous.workspaceObservations.after) !==
+              fingerprint(parsed.workspaceObservations?.after)))
+      )
+        throw new WorkflowError(
+          'PROVENANCE_CHANGED',
+          'Observed workspace evidence cannot be replaced after it is recorded.',
+        );
       if (previous.startedAt && parsed.startedAt !== previous.startedAt)
         throw new WorkflowError(
           'INVALID_CHECK_TIMING',

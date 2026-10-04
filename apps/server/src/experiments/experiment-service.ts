@@ -1,3 +1,10 @@
+import { performance } from 'node:perf_hooks';
+import { executeSuite } from '../evaluations/suite-runner.js';
+import {
+  observationScope,
+  observeWorkspace,
+  unavailableObservation,
+} from '../evaluations/workspace-observation.js';
 import { summarizeSuite } from '../evaluations/suite-summary.js';
 import { EvaluationEvidenceStore } from '../evaluations/evidence-store.js';
 import {
@@ -12,6 +19,7 @@ import { join } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import {
   evaluationResultSchema,
+  isEvaluationSuite,
   implementationEvidenceSchema,
   type ImplementationEvidence,
   type Experiment,
@@ -40,7 +48,10 @@ import {
 
 export class ExperimentService {
   readonly evidence: EvaluationEvidenceStore;
-  private readonly active = new Map<string, Execution>();
+  private readonly active = new Map<
+    string,
+    { cancel(): void; done: Promise<void> }
+  >();
   constructor(
     private readonly database: PaperloopDatabase,
     private readonly projects: ProjectService,
@@ -71,6 +82,24 @@ export class ExperimentService {
                         ),
                       ),
                     ],
+                  }
+                : {}),
+              ...(row.payload.suiteExecution
+                ? {
+                    suiteExecution: {
+                      ...row.payload.suiteExecution,
+                      after: {
+                        ...row.payload.suiteExecution.before,
+                        status: 'unavailable' as const,
+                        identity: null,
+                        revision: null,
+                        files: 0,
+                        bytes: 0,
+                        lockfiles: [],
+                        reason:
+                          'Service restarted before a safe final observation; reconcile surviving processes.',
+                      },
+                    },
                   }
                 : {}),
               status: 'interrupted',
@@ -160,9 +189,11 @@ export class ExperimentService {
   }
   detail(id: string): ExperimentDetail {
     const experiment = this.get(id);
+    const plan = this.plans.get(experiment.planId);
+    const suite = isEvaluationSuite(plan.configuration);
     return {
       experiment,
-      plan: this.plans.get(experiment.planId),
+      plan,
       runs: this.database.db
         .select()
         .from(evaluationRuns)
@@ -186,7 +217,9 @@ export class ExperimentService {
               ]
             : experiment.status === 'ready'
               ? [
-                  'Run the approved candidate and compare compatible baseline/candidate evidence.',
+                  suite
+                    ? 'Run the approved candidate and inspect check/case evidence. Layered comparisons are not available yet.'
+                    : 'Run the approved candidate and compare compatible baseline/candidate evidence.',
                 ]
               : experiment.status === 'claimed'
                 ? [
@@ -195,7 +228,9 @@ export class ExperimentService {
                 : [
                     'Run the approved baseline.',
                     'Claim the implementation job and change only the candidate workspace.',
-                    'Report ready with the ownership token, run the candidate, and compare.',
+                    suite
+                      ? 'Report ready with the ownership token, run the candidate, and inspect its checks. Layered comparisons are not available yet.'
+                      : 'Report ready with the ownership token, run the candidate, and compare.',
                   ],
     };
   }
@@ -210,7 +245,7 @@ export class ExperimentService {
       const recommendation = this.database.db.select().from(researchRecommendations).where(and(eq(researchRecommendations.id, input.recommendationId), eq(researchRecommendations.projectId, projectId))).get()?.payload;
       if (!recommendation || recommendation.documentId !== paper.id || recommendation.proposal.projectContextVersion !== project.currentContext.version) throw new WorkflowError('RESEARCH_CONTEXT_CHANGED', 'The recommendation is unavailable or stale. Reassess it in Research before implementation.');
     }
-    const plan = this.plans.requireExecutable(input.planId);
+    const plan = this.plans.requireApproved(input.planId);
     if (plan.projectId !== projectId)
       throw new WorkflowError(
         'WRONG_PROJECT',
@@ -416,7 +451,7 @@ export class ExperimentService {
   startRun(id: string, role: 'baseline' | 'candidate'): EvaluationRun {
     this.checkAutomationBudget(id);
     const experiment = this.get(id);
-    const plan = this.plans.requireExecutable(experiment.planId);
+    const plan = this.plans.requireApproved(experiment.planId);
     if (
       experiment.status === 'claimed' &&
       Date.parse(experiment.claimExpiresAt ?? '') <= Date.now()
@@ -447,7 +482,14 @@ export class ExperimentService {
       );
     const workspace =
       role === 'baseline' ? experiment.baselinePath : experiment.candidatePath;
-    const run: EvaluationRun = {
+    const suite = isEvaluationSuite(plan.configuration)
+      ? plan.configuration
+      : null;
+    const scope = suite ? observationScope(workspace, suite) : null;
+    const overallDeadline = suite
+      ? performance.now() + suite.overallTimeoutMs
+      : undefined;
+    let run: EvaluationRun = {
       id: randomUUID(),
       experimentId: id,
       planId: plan.id,
@@ -455,7 +497,7 @@ export class ExperimentService {
       status: 'running',
       producer: 'harness',
       producerIdentity: 'paperloop-local-harness',
-      codeIdentity: codeIdentity(workspace),
+      codeIdentity: suite ? 'unobserved' : codeIdentity(workspace),
       planFingerprint: plan.fingerprint,
       datasetIdentity: plan.configuration.datasetIdentity,
       environmentIdentity: plan.configuration.environmentIdentity,
@@ -468,6 +510,37 @@ export class ExperimentService {
     };
     this.database.db.transaction(() => {
       this.checkAutomationBudget(id);
+      this.plans.requireApproved(plan.id);
+      if (suite && scope) {
+        const authorization = this.checkAutomationAuthorization(id);
+        run = {
+          ...run,
+          suiteExecution: {
+            before: unavailableObservation(
+              scope,
+              'Observation pending before command dispatch.',
+            ),
+            after: null,
+            datasetVerification: 'declared',
+            environmentVerification: 'declared',
+            observerRuntime: {
+              node: process.version,
+              platform: process.platform,
+              architecture: process.arch,
+            },
+            authorization: {
+              mode: authorization ? 'automation' : 'manual',
+              attemptNumber: this.detail(id).runs.length + 1,
+              maxRuns: authorization
+                ? Math.min(
+                    authorization.rule.maxRuns,
+                    authorization.automation.maxRuns,
+                  )
+                : null,
+            },
+          },
+        };
+      }
       this.database.db
         .insert(evaluationRuns)
         .values({
@@ -478,17 +551,74 @@ export class ExperimentService {
         })
         .run();
     });
-    let execution: Execution;
+    let execution: Execution | ReturnType<typeof executeSuite>;
     try {
-      execution = executePlan(
-        plan,
-        workspace,
-        join(this.database.dataDirectory, 'runs', run.id),
-      );
+      if (suite && scope && run.suiteExecution) {
+        const observed = observeWorkspace(workspace, scope);
+        run = {
+          ...run,
+          codeIdentity: observed.identity
+            ? `${observed.revision ?? 'revision-unavailable'}:${observed.identity}`
+            : 'unobserved',
+          suiteExecution: { ...run.suiteExecution, before: observed },
+        };
+        this.database.db
+          .update(evaluationRuns)
+          .set({ payload: run })
+          .where(eq(evaluationRuns.id, run.id))
+          .run();
+        const budget = run.suiteExecution!.authorization;
+        execution = executeSuite({
+          plan,
+          runId: run.id,
+          workspace,
+          artifactDirectory: join(this.database.dataDirectory, 'runs', run.id),
+          evidence: this.evidence,
+          overallDeadline: overallDeadline!,
+          observe: () => observeWorkspace(workspace, scope),
+          authorize: () => {
+            this.plans.requireApproved(plan.id);
+            if (this.get(id).status === 'interrupted')
+              throw new WorkflowError(
+                'RECONCILIATION_REQUIRED',
+                'Reconcile the interrupted experiment before dispatching more checks.',
+              );
+            const current = this.checkAutomationAuthorization(id);
+            if ((budget.mode === 'automation') !== Boolean(current))
+              throw new WorkflowError(
+                'AUTOMATION_CHANGED',
+                'The attempt must retain its original authorization mode.',
+              );
+            if (
+              current &&
+              budget.attemptNumber >
+                Math.min(
+                  current.rule.maxRuns,
+                  current.automation.maxRuns,
+                  budget.maxRuns!,
+                )
+            )
+              throw new WorkflowError(
+                'RUN_LIMIT',
+                'The current or retained evaluation run ceiling no longer authorizes this attempt.',
+              );
+          },
+        });
+      } else
+        execution = executePlan(
+          plan,
+          workspace,
+          join(this.database.dataDirectory, 'runs', run.id),
+        );
     } catch (failure) {
+      if (suite) this.evidence.interrupt(run.id, new Date().toISOString());
       const failed: EvaluationRun = {
         ...run,
         status: 'failed',
+        result:
+          suite && this.evidence.checks(run.id).length
+            ? summarizeSuite(this.evidence.checks(run.id))
+            : run.result,
         error:
           failure instanceof Error
             ? failure.message
@@ -502,33 +632,86 @@ export class ExperimentService {
         .run();
       return failed;
     }
-    this.active.set(run.id, execution);
-    void execution.done.then((result) => {
-      const { artifacts, ...evidence } = result;
-      const completed: EvaluationRun = {
-        ...run,
-        ...evidence,
-        artifactReferences: artifacts,
-        finishedAt: new Date().toISOString(),
-      };
-      this.database.db.transaction((tx) => {
-        tx.update(evaluationRuns)
-          .set({ status: completed.status, payload: completed })
-          .where(eq(evaluationRuns.id, run.id))
-          .run();
-        if (completed.status === 'interrupted') {
-          this.save({
-            ...this.get(id),
-            status: 'interrupted',
-            reconciliation: null,
-          });
-          tx.update(experimentJobs)
-            .set({ status: 'interrupted' })
-            .where(eq(experimentJobs.experimentId, id))
+    const settled = execution.done
+      .then((result) => {
+        const { artifacts, ...evidence } = result;
+        const after = scope
+          ? result.status === 'interrupted'
+            ? unavailableObservation(
+                scope,
+                'Process termination was not confirmed; no final workspace observation was taken.',
+              )
+            : overallDeadline !== undefined &&
+                performance.now() >= overallDeadline
+              ? unavailableObservation(
+                  scope,
+                  'Overall execution deadline reached before a final workspace observation.',
+                )
+              : observeWorkspace(workspace, scope)
+          : null;
+        const completed: EvaluationRun = {
+          ...run,
+          ...evidence,
+          ...(run.suiteExecution
+            ? { suiteExecution: { ...run.suiteExecution, after } }
+            : {}),
+          artifactReferences: artifacts,
+          finishedAt: new Date().toISOString(),
+        };
+        this.database.db.transaction((tx) => {
+          tx.update(evaluationRuns)
+            .set({ status: completed.status, payload: completed })
+            .where(eq(evaluationRuns.id, run.id))
             .run();
+          if (completed.status === 'interrupted') this.interruptExperiment(id);
+        });
+      })
+      .catch((failure: unknown) => {
+        // A storage/approval failure can prevent the engine's terminal write. Never
+        // silently retry checks or leave an unhandled completion promise.
+        try {
+          this.database.db.transaction((tx) => {
+            this.evidence.interrupt(run.id, new Date().toISOString());
+            const checks = this.evidence.checks(run.id);
+            const interrupted: EvaluationRun = {
+              ...run,
+              status: 'interrupted',
+              result: checks.length ? summarizeSuite(checks) : null,
+              error: `Could not persist the evaluation safely: ${failure instanceof Error ? failure.message : 'Unknown storage failure'}. Reconcile before retrying.`,
+              finishedAt: new Date().toISOString(),
+              artifactReferences: [
+                ...new Set(
+                  checks.flatMap((check) => check.result.artifactReferences),
+                ),
+              ],
+              ...(run.suiteExecution && scope
+                ? {
+                    suiteExecution: {
+                      ...run.suiteExecution,
+                      after: unavailableObservation(
+                        scope,
+                        'Final observation unavailable after a persistence or authorization failure.',
+                      ),
+                    },
+                  }
+                : {}),
+            };
+            tx.update(evaluationRuns)
+              .set({ status: interrupted.status, payload: interrupted })
+              .where(eq(evaluationRuns.id, run.id))
+              .run();
+            this.interruptExperiment(id);
+          });
+        } catch {
+          /* Durable running records are interrupted on the next successful startup if storage is unavailable. */
         }
+      })
+      .finally(() => {
+        this.active.delete(run.id);
       });
-      this.active.delete(run.id);
+    this.active.set(run.id, {
+      cancel: () => execution.cancel(),
+      done: settled,
     });
     return run;
   }
@@ -739,6 +922,14 @@ export class ExperimentService {
     await Promise.allSettled(
       [...this.active.values()].map((execution) => execution.done),
     );
+  }
+  private interruptExperiment(id: string): void {
+    this.save({ ...this.get(id), status: 'interrupted', reconciliation: null });
+    this.database.db
+      .update(experimentJobs)
+      .set({ status: 'interrupted' })
+      .where(eq(experimentJobs.experimentId, id))
+      .run();
   }
   private checkAutomationAuthorization(id: string) {
     const automation = this.database.db

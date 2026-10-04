@@ -206,16 +206,16 @@ describe('suite storage and compatibility boundaries', () => {
     );
     expect(() => app.plans.requireApproved(plan.id)).toThrow(/Approve/);
   });
-  it('blocks suite preparation, running, imports, comparison, and automation before side effects', () => {
+  it('keeps suite imports, comparison, automation and legacy execution guarded while preventing overlapping runs', () => {
     const { app, project, paper, plan, experiment, run, root } = fixture();
-    expect(() =>
+    expect(
       app.experiments.create(project.id, {
         documentId: paper.id,
         planId: plan.id,
-      }),
-    ).toThrow(/not available/);
+      }).experiment.id,
+    ).toBe(experiment.id);
     expect(() => app.experiments.startRun(experiment.id, 'baseline')).toThrow(
-      /not available/,
+      /already running/,
     );
     expect(() =>
       app.experiments.importResult(

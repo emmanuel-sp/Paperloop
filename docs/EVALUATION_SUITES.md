@@ -1,13 +1,12 @@
 # Layered Evaluation proposal (#66)
 
-Status: design record for the first bounded #66 phase, grounded in main
-`0aa10bc7590e587bc145b4298b8ae8d20bd1aff9`. This records the proposed implementation
-baseline before changing runtime contracts. It ships documentation, illustrative
-JSON and a populated browser sketch only. It neither approves commands nor
-implements suites. #66 remains open. #47 owns the detailed comparison UI; #46 owns
-shared scenarios and final verification. Search/AI-quality research is outside scope.
+Status: design record and staged implementation checkpoints for #66. The original
+proposal was grounded in main `0aa10bc7590e587bc145b4298b8ae8d20bd1aff9` before
+runtime contracts changed. Checkpoints below record what is implemented and what
+remains. #66 stays open. #47 owns the detailed comparison UI; #46 owns shared
+scenarios and final verification. Search/AI-quality research is outside scope.
 
-## Current behavior and concrete limitations
+## Original baseline behavior and concrete limitations
 
 | Area | Current evidence | Consequence for the design |
 | --- | --- | --- |
@@ -31,9 +30,10 @@ will need stricter expected-check membership and coverage validation.
 
 ## Examples before selecting the model
 
-The examples are proposed format-v2 drafts for illustrative repositories with
-supplied scripts/report settings. They are not claims about the current checkout
-and are not accepted by today's strict v1 schema.
+The examples are format-v2 drafts for illustrative repositories with supplied
+scripts/report settings. They are accepted by the shared v2 schema; their proposed
+ordinary-user flow is still awaiting the assisted editor. They are not claims
+about the current checkout or measurements from the owner's project.
 
 **Conventional checkout application.** [application.json](evaluation-design/examples/application.json)
 runs build, types and lint; then 480 unit cases, 24 integration cases and 30 browser
@@ -550,3 +550,74 @@ v2 execution. Then phase D delivers agent-led suggestions and plain-language
 corrections/review with optional expert editing; #47 presents comparisons and #46
 verifies the complete user flow across viewports. These outstanding requirements
 remain in #66 rather than being claimed complete by this internal engine.
+
+
+## Phase C2a implementation checkpoint
+
+Approved suites now use the existing experiment preparation and run operations
+through HTTP/MCP. Preparation creates isolated baseline/candidate workspaces;
+execution requires the exact stored approval, respects candidate readiness and
+active-run/reconciliation guards, and reserves one durable parent attempt before
+launching any check. A suite with hundreds of cases still costs one run. Failed,
+cancelled, timed-out and interrupted attempts remain counted; retries require a
+new full run ID and artifact directory.
+
+Automation-linked attempts retain their reservation ordinal and the smaller of
+the original/current run ceilings. Every dispatch and live authorization poll
+checks the stored exact approval, current enabled rule/plan/goal/category and the
+retained ceiling. The last permitted reserved attempt can finish without being
+mistaken for a new over-budget run; reducing its ceiling or revoking its scope
+stops further work. Raising a current rule cannot expand an old reservation.
+Public suite automation activation remains guarded until C2b; controlled storage
+fixtures exercise these boundaries ahead of that activation.
+
+Parent completion now waits for evidence persistence. Cancellation reaches the
+suite engine; uncertain termination or failed terminal evidence writes interrupt
+the experiment and require reconciliation. Startup preserves completed checks,
+partial cases and summaries without replaying commands. Managed shutdown waits
+for child cleanup **and** parent persistence. If storage itself remains unavailable,
+the durable running checkpoint is interrupted on the next successful startup.
+An output pipe that remains open 750 ms after the leader exits, or termination
+that remains unresolved after a 2.75-second cancellation grace, interrupts the
+attempt rather than hanging or reporting success. These observations confirm the
+managed process group/output lifecycle; they are not an OS sandbox attestation.
+Per-check artifact-reference overflow is bounded unknown evidence, rather than an
+accidental terminal-record schema/storage failure.
+
+The server automatically records scoped workspace observations before/after a run
+and each dispatched check. It hashes file paths/content and observed lockfiles,
+records Git HEAD when available and labels the observer's own Node/platform/CPU
+runtime. It excludes Git metadata, dependency directories and the approved report
+paths; the exclusion fingerprint binds that scope to the saved suite. Registered
+additional artifacts are not silently excluded from the observed workspace.
+Bounds are 1 second per observation (including a ≤250 ms Git read), 10 MB per
+file, 50 MB total, 10,000 files, 20,000 entries, 64 directory levels, 500-character
+paths and 50 lockfiles. File descriptor and final metadata checks reject changing
+or symlinked evidence. Over-limit/unavailable observations retain an explanation
+and no complete identity. Recorded check observations cannot be rewritten.
+Dataset/environment names remain explicitly **declared**. The observer does not
+claim to know arbitrary test tool versions, dependency installations, dataset
+contents outside the workspace or equivalent environments from matching labels.
+Unknown cleanup/restart leaves final provenance unavailable.
+
+These optional result fields do not rehash v1 approvals or change historical JSON
+payloads, and require no database migration or user-entered fields. The suite screen
+still permits inspection while assisted setup awaits phase D; its notice now
+accurately describes that screen. It adds no approval or execution controls.
+The existing trusted-browser exact-fingerprint approval boundary is preserved;
+there is no MCP approval tool. Only controlled test fixtures were approved/run.
+
+Controlled integration verification covers real Node JUnit reports (301 cases),
+baseline/candidate isolation with a dirty original preserved, measurements from an
+existing local benchmark, failed required checks/dependency skips, durable budgets,
+last-attempt completion, retained/increased/reduced ceilings, revocation, changed
+approval, HTTP cancellation, process cleanup/reconciliation, failed writes, startup
+recovery, unavailable provenance and real MCP/HTTP result/case reads. Legacy tests
+and representative populated browser workflows remain part of the merge gate.
+
+**Next unit: C2b.** Strict external-suite import membership/case/provenance handling,
+recomputed required-validation/comparison facts and suite automation activation.
+Imports and comparison remain explicitly unavailable for v2 until that review.
+Then D supplies agent-led inference/correction/exact review, #47 presents detailed
+comparisons and #46 verifies complete flows across viewports. No remaining #66
+acceptance criterion is closed based solely on this execution integration.

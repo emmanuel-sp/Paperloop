@@ -7,6 +7,7 @@ import {
   type EvaluationPlan,
   type SuiteCheckRecord,
   type EvaluationResult,
+  type WorkspaceObservation,
 } from '@paperloop/contracts';
 import { within } from '../experiments/workspaces.js';
 import { EvaluationEvidenceStore } from './evidence-store.js';
@@ -57,8 +58,8 @@ interface ProcessResult {
   stderr: Buffer;
   truncated: boolean;
 }
-// One bounded serial engine. Public experiment/automation entry points remain
-// guarded until budget reservation and comparison integration are reviewed.
+// A bounded serial engine used after the experiment service reserves a parent
+// attempt. Imports, comparisons and automation activation have separate guards.
 export function executeSuite(options: {
   plan: EvaluationPlan;
   runId: string;
@@ -67,6 +68,8 @@ export function executeSuite(options: {
   evidence: EvaluationEvidenceStore;
   // Must check the current exact approval and any live automation authorization.
   authorize(): void;
+  observe?: () => WorkspaceObservation;
+  overallDeadline?: number;
 }): SuiteExecution {
   const { plan, runId, workspace, artifactDirectory, evidence } = options;
   const authorize = () => {
@@ -104,7 +107,15 @@ export function executeSuite(options: {
     { flag: 'wx', mode: 0o600 },
   );
   const artifacts = new ArtifactRegistry(artifactDirectory);
-  const deadline = performance.now() + suite.overallTimeoutMs;
+  if (
+    options.overallDeadline !== undefined &&
+    !Number.isFinite(options.overallDeadline)
+  )
+    throw new Error('Overall execution deadline must be finite.');
+  const deadline = Math.min(
+    performance.now() + suite.overallTimeoutMs,
+    options.overallDeadline ?? Infinity,
+  );
   let cancelled = false;
   let activeCancel: (() => void) | undefined;
   let retainedLogs = 0;
@@ -140,6 +151,8 @@ export function executeSuite(options: {
       let stop: ProcessResult['stop'];
       let error: string | undefined;
       let killTimer: ReturnType<typeof setTimeout> | undefined;
+      let pipeTimer: ReturnType<typeof setTimeout> | undefined;
+      let stopTimer: ReturnType<typeof setTimeout> | undefined;
       const signal = (signal: NodeJS.Signals) => {
         if (child.pid) {
           try {
@@ -155,6 +168,9 @@ export function executeSuite(options: {
         stop = reason;
         signal('SIGTERM');
         killTimer = setTimeout(() => signal('SIGKILL'), 250);
+        stopTimer = setTimeout(() => {
+          void finalize(child.exitCode, true);
+        }, 2750);
       };
       activeCancel = () => halt('cancelled');
       const capture = (
@@ -188,7 +204,15 @@ export function executeSuite(options: {
       });
       // A leader can exit while descendants keep its pipes open. Stop that group
       // immediately instead of waiting for the check timeout to release the pipes.
-      child.once('exit', () => signal('SIGKILL'));
+      child.once('exit', () => {
+        if (closing) return;
+        signal('SIGKILL');
+        // An escaped descendant can hold inherited pipes open even after this
+        // group stops. Bound the wait and require reconciliation, never success.
+        pipeTimer = setTimeout(() => {
+          void finalize(child.exitCode, true);
+        }, 750);
+      });
       const timeout = setTimeout(
         () => halt('timed_out'),
         Math.max(1, timeoutMs),
@@ -202,15 +226,26 @@ export function executeSuite(options: {
           halt('cancelled');
         }
       }, 100);
-      child.once('close', async (exitCode) => {
+      const finalize = async (exitCode: number | null, forced = false) => {
+        if (closing) return;
         closing = true;
         activeCancel = undefined;
         clearTimeout(timeout);
         clearInterval(authorization);
         if (killTimer) clearTimeout(killTimer);
+        if (pipeTimer) clearTimeout(pipeTimer);
+        if (stopTimer) clearTimeout(stopTimer);
         signal('SIGKILL');
+        if (forced) {
+          error ??=
+            'Process/output termination could not be confirmed. Reconcile surviving descendants before retrying.';
+          child.stdout.destroy();
+          child.stderr.destroy();
+          child.unref();
+        }
         const stopped =
-          !child.pid || (await confirmProcessGroupStopped(child.pid));
+          !forced &&
+          (!child.pid || (await confirmProcessGroupStopped(child.pid)));
         resolve({
           exitCode,
           stop,
@@ -220,6 +255,9 @@ export function executeSuite(options: {
           stderr: Buffer.concat(stderr),
           truncated,
         });
+      };
+      child.once('close', (exitCode) => {
+        void finalize(exitCode);
       });
       if (cancelled) halt('cancelled');
     });
@@ -292,6 +330,7 @@ export function executeSuite(options: {
           clearReport(workspace, cwd, check.report.path);
         if (check.report.adapter === 'metrics-v1' && check.report.cases)
           clearReport(workspace, cwd, check.report.cases.path);
+        const before = options.observe?.();
         authorize();
         if (cancelled || performance.now() >= deadline) {
           status = cancelled ? 'cancelled' : 'timed_out';
@@ -309,6 +348,7 @@ export function executeSuite(options: {
           ...record,
           startedAt: new Date().toISOString(),
           result: { ...record.result, status: 'running' },
+          ...(before ? { workspaceObservations: { before, after: null } } : {}),
         });
         const remaining = deadline - performance.now();
         const execution = await processCheck(
@@ -321,6 +361,20 @@ export function executeSuite(options: {
           logsTruncated: execution.truncated,
           result: { ...record.result, exitCode: execution.exitCode },
         };
+        if (
+          execution.stopped &&
+          performance.now() < deadline &&
+          options.observe &&
+          record.workspaceObservations
+        ) {
+          record = evidence.update({
+            ...record,
+            workspaceObservations: {
+              ...record.workspaceObservations,
+              after: options.observe(),
+            },
+          });
+        }
         if (!execution.stopped) status = 'interrupted';
         for (const [suffix, bytes] of [
           ['stdout.log', execution.stdout],
@@ -333,6 +387,7 @@ export function executeSuite(options: {
         if (!execution.stopped) {
           status = 'interrupted';
           error =
+            execution.error ??
             'Could not confirm the process group stopped. Reconcile surviving processes before retrying.';
           record.result = {
             ...record.result,
@@ -419,6 +474,11 @@ export function executeSuite(options: {
               metrics: parsed.metrics,
               evidenceStatus: 'valid',
             };
+            if (references.length + parsed.artifacts.length > 100)
+              throw new EvidenceError(
+                'exceeds_limit',
+                'Check exceeds 100 registered artifact references.',
+              );
             for (const [index, path] of parsed.artifacts.entries()) {
               const bytes = readEvidence(workspace, cwd, path, ARTIFACT_BYTES);
               const name = `${check.id}--artifact-${index}`;
@@ -462,7 +522,8 @@ export function executeSuite(options: {
       finish(record);
     }
     if (status === 'completed' && cancelled) status = 'cancelled';
-    if (status === 'completed' && performance.now() >= deadline) status = 'timed_out';
+    if (status === 'completed' && performance.now() >= deadline)
+      status = 'timed_out';
     return {
       status,
       result: summarizeSuite(evidence.checks(runId)),

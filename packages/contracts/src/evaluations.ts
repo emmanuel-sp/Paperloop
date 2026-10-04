@@ -303,6 +303,74 @@ export type LegacyEvaluationResult = z.infer<
   typeof legacyEvaluationResultSchema
 >;
 export type SuiteCheckResult = z.infer<typeof suiteCheckResultSchema>;
+const sha256 = z.string().regex(/^[a-f0-9]{64}$/);
+export const workspaceObservationSchema = z
+  .object({
+    status: z.enum(['observed', 'unavailable']),
+    identity: sha256.nullable(),
+    revision: z.string().min(1).max(200).nullable(),
+    scope: z.literal(
+      'workspace-without-git-dependencies-and-approved-reports-v1',
+    ),
+    exclusionFingerprint: sha256,
+    files: z.number().int().nonnegative().max(10000),
+    bytes: z.number().int().nonnegative().max(50000000),
+    lockfiles: z
+      .array(z.object({ path: z.string().min(1).max(500), sha256 }).strict())
+      .max(50),
+    reason: text.optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if ((value.status === 'observed') !== (value.identity !== null))
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'Only a complete observation may declare a workspace identity.',
+      });
+    if (value.status === 'unavailable' && !value.reason)
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Unavailable observations require an explanation.',
+      });
+  });
+export type WorkspaceObservation = z.infer<typeof workspaceObservationSchema>;
+const workspaceObservationsSchema = z
+  .object({
+    before: workspaceObservationSchema,
+    after: workspaceObservationSchema.nullable(),
+  })
+  .strict();
+export const suiteExecutionProvenanceSchema = workspaceObservationsSchema
+  .extend({
+    datasetVerification: z.literal('declared'),
+    environmentVerification: z.literal('declared'),
+    observerRuntime: z
+      .object({ node: text, platform: text, architecture: text })
+      .strict(),
+    authorization: z
+      .object({
+        mode: z.enum(['manual', 'automation']),
+        attemptNumber: z.number().int().positive(),
+        maxRuns: z.number().int().positive().nullable(),
+      })
+      .strict(),
+  })
+  .superRefine((value, ctx) => {
+    const budget = value.authorization;
+    if (
+      (budget.mode === 'automation') !== (budget.maxRuns !== null) ||
+      (budget.maxRuns !== null && budget.attemptNumber > budget.maxRuns)
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'Automation attempts require their retained run ceiling; manual attempts have no automation ceiling.',
+      });
+  });
+export type SuiteExecutionProvenance = z.infer<
+  typeof suiteExecutionProvenanceSchema
+>;
 export const suiteCheckRecordSchema = z
   .object({
     runId: z.uuid(),
@@ -316,6 +384,7 @@ export const suiteCheckRecordSchema = z
     finishedAt: z.iso.datetime().nullable(),
     durationMs: z.number().int().nonnegative().nullable(),
     logsTruncated: z.boolean().default(false),
+    workspaceObservations: workspaceObservationsSchema.optional(),
     result: suiteCheckResultSchema,
   })
   .strict()
@@ -445,6 +514,7 @@ export const runSchema = z.object({
   producer: z.enum(['harness', 'external']),
   producerIdentity: z.string(),
   codeIdentity: z.string(),
+  suiteExecution: suiteExecutionProvenanceSchema.optional(),
   planFingerprint: z.string(),
   datasetIdentity: z.string(),
   environmentIdentity: z.string(),

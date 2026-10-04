@@ -132,7 +132,7 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
         <p>Define the criteria before your coding agent implements; evaluate the candidate after it reports readiness.</p>
         <details><summary>Why this Evaluation?</summary><ul>{suggestion.data.rationale.map(reason => <li key={reason}>{reason}</li>)}</ul><p>Research angle: {suggestion.data.researchAngle}</p></details>
         {suggestion.data.limitations.map(item => <p className="muted" key={item}>{item}</p>)}
-        {suggestion.data.draft ? <><p>Metrics: {isEvaluationSuite(suggestion.data.draft) ? `${suggestion.data.draft.checks.length} checks; suite execution is not available yet` : suggestion.data.draft.metrics.map(metric => `${metric.name} (${metric.unit})`).join(', ')}</p><button className="button" disabled={useSuggestion.isPending} onClick={() => useSuggestion.mutate()}>Use suggested Evaluation</button></> : null}
+        {suggestion.data.draft ? <><p>Metrics: {isEvaluationSuite(suggestion.data.draft) ? `${suggestion.data.draft.checks.length} checks; assisted suite setup is not available yet` : suggestion.data.draft.metrics.map(metric => `${metric.name} (${metric.unit})`).join(', ')}</p><button className="button" disabled={useSuggestion.isPending} onClick={() => useSuggestion.mutate()}>Use suggested Evaluation</button></> : null}
         {suggestion.data.plan?.approvedAt && !isEvaluationSuite(suggestion.data.plan.configuration) && documentId ? <button className="button primary" disabled={useSuggestion.isPending} onClick={() => useSuggestion.mutate(undefined, { onSuccess: () => setParams(previous => { const next = new URLSearchParams(previous); next.set('view', 'prepare'); next.set('plan', suggestion.data!.plan!.id); return next; }) })}>Continue to implementation</button> : null}
       </section> : null}
       {useSuggestion.error ? <p role="alert">{useSuggestion.error.message}</p> : null}
@@ -449,7 +449,7 @@ export function EvaluationWorkspace({ projectId }: { projectId: string }) {
             <h2>{plan.configuration.name}</h2>
             {isEvaluationSuite(plan.configuration) ? <>
               <p>{plan.configuration.checks.length} checks · overall limit {plan.configuration.overallTimeoutMs / 1000}s</p>
-              <p className="workflow-notice">Layered Evaluation execution is not available yet. You can inspect this saved suite.</p>
+              <p className="workflow-notice">Layered Evaluation setup is not available in this screen yet. You can inspect this saved suite.</p>
               <ul>{plan.configuration.checks.map(check => <li key={check.id}>{check.name} · {check.required ? 'required' : 'optional'} · {check.report.adapter}</li>)}</ul>
             </> : <>
             <p>Measures {plan.configuration.metrics.map(metric => `${metric.name} in ${metric.unit}${metric.guardrail ? ' (guardrail)' : ''}`).join('; ')}.</p>
